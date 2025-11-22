@@ -71,3 +71,15 @@
     font-family: var(--font-header);
   }
 }
+
+@layer utilities {
+  .login-carousel-slant {
+    clip-path: polygon(0 0, 100% 0, 90% 100%, 0 100%);
+  }
+  
+  @media (max-width: 768px) {
+    .login-carousel-slant {
+      clip-path: none;
+    }
+  }
+}
