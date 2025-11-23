@@ -12,43 +12,45 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:100',
-            'email' => 'sometimes|email|unique:user,email,' . $user->user_id . ',user_id',
-            'phone' => 'nullable|string|max:20',
+        $rules = [
+            'name' => 'required|string|max:100',
+            'email' => 'required|email|unique:user,email,' . $user->user_id . ',user_id',
             'address_line' => 'nullable|string|max:255',
             'district' => 'nullable|string|max:255',
             'city' => 'nullable|string|max:255',
             'province' => 'nullable|string|max:255',
             'postal_code' => 'nullable|string|max:20',
             'profile_pic' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'profile_pic_path' => 'nullable|string|max:255',
+        ];
+        
+        // Only validate phone regex if phone is provided and not empty
+        if ($request->has('phone') && $request->filled('phone')) {
+            $rules['phone'] = 'required|string|max:20|regex:/^\+62[0-9]{8,}$/';
+        } else {
+            $rules['phone'] = 'nullable|string|max:20';
+        }
+
+        $validated = $request->validate($rules, [
+            'phone.regex' => 'Phone number must start with +62 and have at least 8 digits after the country code.',
         ]);
 
-        $updateData = [];
+        $updateData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+        ];
         
-        if ($request->has('name')) {
-            $updateData['name'] = $validated['name'];
-        }
-        if ($request->has('email')) {
-            $updateData['email'] = $validated['email'];
-        }
+        // Handle phone - set to null if empty, otherwise use validated value
         if ($request->has('phone')) {
-            $updateData['phone'] = $validated['phone'];
+            $updateData['phone'] = $request->filled('phone') ? $validated['phone'] : null;
         }
-        if ($request->has('address_line')) {
-            $updateData['address_line'] = $validated['address_line'];
-        }
-        if ($request->has('district')) {
-            $updateData['district'] = $validated['district'];
-        }
-        if ($request->has('city')) {
-            $updateData['city'] = $validated['city'];
-        }
-        if ($request->has('province')) {
-            $updateData['province'] = $validated['province'];
-        }
-        if ($request->has('postal_code')) {
-            $updateData['postal_code'] = $validated['postal_code'];
+        
+        // Handle nullable fields
+        $nullableFields = ['address_line', 'district', 'city', 'province', 'postal_code'];
+        foreach ($nullableFields as $field) {
+            if ($request->has($field)) {
+                $updateData[$field] = $request->filled($field) ? $validated[$field] : null;
+            }
         }
 
         if ($request->hasFile('profile_pic')) {
@@ -57,9 +59,15 @@ class ProfileController extends Controller
             }
             $path = $request->file('profile_pic')->store('profiles', 'public');
             $updateData['profile_pic'] = $path;
+        } elseif ($request->has('profile_pic_path')) {
+            // Use path from Next.js upload (saved to public/profile_pics)
+            $updateData['profile_pic'] = $validated['profile_pic_path'];
         }
 
         $user->update($updateData);
+        
+        // Refresh the user model to get updated data
+        $user->refresh();
 
         return response()->json($user);
     }
@@ -76,6 +84,29 @@ class ProfileController extends Controller
         if (!Hash::check($validated['current_password'], $user->password)) {
             return response()->json([
                 'message' => 'Current password is incorrect'
+            ], 400);
+        }
+
+        // Additional password complexity check
+        $password = $validated['password'];
+        $errors = [];
+        
+        if (!preg_match('/[A-Z]/', $password)) {
+            $errors[] = 'Password must contain at least one uppercase letter.';
+        }
+        if (!preg_match('/[a-z]/', $password)) {
+            $errors[] = 'Password must contain at least one lowercase letter.';
+        }
+        if (!preg_match('/[0-9]/', $password)) {
+            $errors[] = 'Password must contain at least one number.';
+        }
+        if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+            $errors[] = 'Password must contain at least one symbol.';
+        }
+
+        if (!empty($errors)) {
+            return response()->json([
+                'message' => implode(' ', $errors)
             ], 400);
         }
 

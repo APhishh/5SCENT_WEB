@@ -168,21 +168,25 @@ export default function BestSellerSection() {
                 </div>
 
                 {/* Product Image */}
-                <div className="relative h-64 bg-gray-100">
-                  <Image
-                    src={imageUrl}
-                    alt={product.name}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
+                <Link href={`/products/${product.product_id}`}>
+                  <div className="relative h-64 bg-gray-100 cursor-pointer">
+                    <Image
+                      src={imageUrl}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                </Link>
 
                 {/* Product Info */}
                 <div className="p-5">
-                  <h3 className="text-xl font-header font-semibold text-gray-900 mb-3">
-                    {product.name}
-                  </h3>
+                  <Link href={`/products/${product.product_id}`}>
+                    <h3 className="text-xl font-header font-semibold text-gray-900 mb-3 hover:text-gray-700 transition-colors cursor-pointer">
+                      {product.name}
+                    </h3>
+                  </Link>
 
                   {/* Rating - Black stars for actual rating, gray for remaining */}
                   <div className="flex items-center gap-1 mb-3">
