@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -15,6 +15,17 @@ import { TrashIcon, ShoppingBagIcon } from '@heroicons/react/24/outline';
 interface DeleteConfirmation {
   itemId: number | null;
   itemName: string;
+  size: string;
+  isDeleteAll?: boolean;
+}
+
+interface GroupedProduct {
+  productId: number;
+  productName: string;
+  category?: string;
+  images: string[];
+  sizes: string[];
+  cartItems: any[]; // Original cart items for this product
 }
 
 export default function CartPage() {
@@ -27,6 +38,8 @@ export default function CartPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmation>({
     itemId: null,
     itemName: '',
+    size: '',
+    isDeleteAll: false,
   });
 
   useEffect(() => {
@@ -35,6 +48,44 @@ export default function CartPage() {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // Group products by product_id, maintaining size order
+  const groupedProducts = useMemo(() => {
+    const groups: { [key: number]: GroupedProduct } = {};
+
+    items.forEach((item) => {
+      const productId = item.product.product_id;
+
+      if (!groups[productId]) {
+        groups[productId] = {
+          productId,
+          productName: item.product.name,
+          category: item.product.category,
+          images: [],
+          sizes: [],
+          cartItems: [],
+        };
+      }
+
+      groups[productId].cartItems.push(item);
+      groups[productId].sizes.push(item.size);
+
+      // Get image for this size
+      const sizeImage = item.product.images.find(
+        (img: any) => 
+          (item.size === '30ml' && img.is_50ml === 0) ||
+          (item.size === '50ml' && img.is_50ml === 1)
+      );
+      
+      if (sizeImage) {
+        groups[productId].images.push(sizeImage.image_url);
+      } else if (item.product.images[0]) {
+        groups[productId].images.push(item.product.images[0].image_url);
+      }
+    });
+
+    return Object.values(groups);
+  }, [items]);
 
   useEffect(() => {
     // Auto-select all items when component mounts
@@ -72,7 +123,7 @@ export default function CartPage() {
     if (newQuantity === 0) {
       const item = items.find(i => i.cart_id === itemId);
       if (item) {
-        handleRemove(itemId, item.product.name);
+        handleRemove(itemId, item.product.name, item.size);
       }
       return;
     }
@@ -84,15 +135,15 @@ export default function CartPage() {
     }
   };
 
-  const handleRemove = async (itemId: number, itemName: string) => {
-    setDeleteConfirm({ itemId, itemName });
+  const handleRemove = async (itemId: number, itemName: string, size: string) => {
+    setDeleteConfirm({ itemId, itemName, size });
   };
 
   const handleConfirmDelete = async (itemId: number) => {
     try {
       await removeFromCart(itemId);
       setSelectedItems(selectedItems.filter(id => id !== itemId));
-      setDeleteConfirm({ itemId: null, itemName: '' });
+      setDeleteConfirm({ itemId: null, itemName: '', size: '', isDeleteAll: false });
       showToast('Item removed from cart', 'success');
     } catch (error: any) {
       showToast(error.message || 'Failed to remove item', 'error');
@@ -100,7 +151,7 @@ export default function CartPage() {
   };
 
   const handleCancelDelete = () => {
-    setDeleteConfirm({ itemId: null, itemName: '' });
+    setDeleteConfirm({ itemId: null, itemName: '', size: '', isDeleteAll: false });
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -112,9 +163,16 @@ export default function CartPage() {
     }
   };
 
-  const handleDeleteAll = async () => {
-    if (!confirm(`Remove ${selectedItems.length} item(s) from cart?`)) return;
-    
+  const handleDeleteAll = () => {
+    setDeleteConfirm({
+      itemId: -1,
+      itemName: `${selectedItems.length} item(s)`,
+      size: '',
+      isDeleteAll: true,
+    });
+  };
+
+  const handleConfirmDeleteAll = async () => {
     try {
       // Remove all selected items in parallel and update UI instantly
       await Promise.all(selectedItems.map(itemId => 
@@ -126,6 +184,7 @@ export default function CartPage() {
       // Clear selections immediately
       setSelectedItems([]);
       setSelectAll(false);
+      setDeleteConfirm({ itemId: null, itemName: '', size: '', isDeleteAll: false });
       showToast('Items removed from cart', 'success');
     } catch (error: any) {
       showToast(error.message || 'Failed to remove items', 'error');
@@ -198,118 +257,182 @@ export default function CartPage() {
                 )}
               </div>
 
-              {/* Cart Items */}
-              <div className="space-y-4">
-                {items.map((item) => {
-                  const image = item.product.images[0];
-                  const imageUrl = image?.image_url || '/placeholder.jpg';
-
-                  return (
-                    <div key={item.cart_id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex gap-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedItems.includes(item.cart_id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedItems([...selectedItems, item.cart_id]);
-                            } else {
-                              setSelectedItems(selectedItems.filter(id => id !== item.cart_id));
-                              setSelectAll(false);
-                            }
-                          }}
-                          className="w-5 h-5 mt-2 cursor-pointer"
-                        />
-                        <Link href={`/products/${item.product.product_id}`}>
-                          <div className="relative w-32 h-32 bg-gray-100 rounded flex-shrink-0">
-                            <Image
-                              src={imageUrl}
-                              alt={item.product.name}
-                              fill
-                              className="object-cover rounded"
-                            />
-                          </div>
-                        </Link>
-                        <div className="flex-1">
-                          <div>
-                            <Link href={`/products/${item.product.product_id}`}>
-                              <h3 className="font-semibold text-gray-900 hover:text-primary-600 text-lg">
-                                {item.product.name}
-                              </h3>
-                            </Link>
-                            <p className="text-sm text-gray-500 mt-1">Size: {item.size}</p>
-                            <p className="text-lg font-semibold text-gray-900 mt-2">
-                              {formatCurrency(item.price)}
-                            </p>
-                          </div>
-                          <div className="mt-4 flex flex-col gap-2">
-                            <div className="flex items-center border border-gray-300 rounded-lg w-fit">
-                              <button
-                                onClick={() => handleQuantityChange(item.cart_id, item.quantity - 1)}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 transition-colors"
-                              >
-                                −
-                              </button>
-                              <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                              <button
-                                onClick={() => handleQuantityChange(item.cart_id, item.quantity + 1)}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 transition-colors"
-                              >
-                                +
-                              </button>
+              {/* Merged Product Containers */}
+              <div className="space-y-6">
+                {groupedProducts.map((group) => (
+                  <div
+                    key={group.productId}
+                    className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    {/* Product Header with Images */}
+                    <div className="flex gap-6 mb-6 pb-6 border-b border-gray-200">
+                      {/* Product Images Container */}
+                      <div className="flex gap-3 flex-shrink-0">
+                        {group.images.map((image, idx) => (
+                          <div key={idx} className="relative group">
+                            <div className="relative w-28 h-32 bg-gray-100 rounded-lg overflow-hidden">
+                              <Image
+                                src={image}
+                                alt={`${group.productName} - ${group.sizes[idx]}`}
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                unoptimized
+                              />
+                              {/* Size Badge */}
+                              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-70 text-white text-xs py-1 px-2 text-center font-semibold">
+                                {group.sizes[idx]}
+                              </div>
                             </div>
-                            <button
-                              onClick={() => handleRemove(item.cart_id, item.product.name)}
-                              className="text-black hover:text-gray-700 transition-colors flex items-center gap-2 w-fit"
-                            >
-                              <TrashIcon className="w-5 h-5" />
-                              <span className="text-sm">Delete</span>
-                            </button>
                           </div>
-                        </div>
+                        ))}
+                      </div>
+
+                      {/* Product Info */}
+                      <div className="flex-1">
+                        <Link href={`/products/${group.productId}`}>
+                          <h3 className="text-lg font-semibold text-gray-900 hover:text-gray-700 transition-colors">
+                            {group.productName}
+                          </h3>
+                        </Link>
+                        {group.category && (
+                          <p className="text-sm text-gray-500 mt-1">{group.category}</p>
+                        )}
+                        <p className="text-sm text-gray-600 mt-2">
+                          {group.sizes.length} size{group.sizes.length > 1 ? 's' : ''} in cart
+                        </p>
                       </div>
                     </div>
-                  );
-                })}
+
+                    {/* Size Rows */}
+                    <div className="space-y-3">
+                      {group.cartItems.map((item) => (
+                        <div
+                          key={item.cart_id}
+                          className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"
+                        >
+                          {/* Checkbox */}
+                          <input
+                            type="checkbox"
+                            checked={selectedItems.includes(item.cart_id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedItems([...selectedItems, item.cart_id]);
+                              } else {
+                                setSelectedItems(selectedItems.filter(id => id !== item.cart_id));
+                                setSelectAll(false);
+                              }
+                            }}
+                            className="w-5 h-5 cursor-pointer flex-shrink-0"
+                          />
+
+                          {/* Size Label */}
+                          <span className="text-sm font-medium text-gray-900 min-w-[70px]">
+                            {item.size}
+                          </span>
+
+                          {/* Price */}
+                          <span className="text-sm font-semibold text-gray-900 min-w-[100px]">
+                            {formatCurrency(item.price)}
+                          </span>
+
+                          {/* Stock Info */}
+                          <span className="text-xs text-gray-600 min-w-[140px]">
+                            Stock: {item.size === '30ml' 
+                              ? item.product.stock_30ml 
+                              : item.product.stock_50ml} available
+                          </span>
+
+                          {/* Quantity Controls */}
+                          <div className="flex items-center border border-gray-300 rounded-lg">
+                            <button
+                              onClick={() => handleQuantityChange(item.cart_id, item.quantity - 1)}
+                              className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700"
+                            >
+                              −
+                            </button>
+                            <span className="w-8 text-center text-sm font-medium text-gray-900">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() => handleQuantityChange(item.cart_id, item.quantity + 1)}
+                              className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 transition-colors text-gray-700"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          {/* Delete Button */}
+                          <button
+                            onClick={() => handleRemove(item.cart_id, group.productName, item.size)}
+                            className="ml-auto text-black hover:text-gray-700 transition-colors flex-shrink-0"
+                            title="Delete this size"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-6 h-fit sticky top-20">
+            {/* Order Summary Sidebar */}
+            <div className="bg-gray-50 rounded-lg p-6 h-fit sticky top-20 border border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900 mb-6 pb-4 border-b border-gray-300">Order Summary</h2>
+              
               <div className="space-y-3 mb-6">
+                {/* Total Items */}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Total Item</span>
+                  <span className="text-gray-600">Total Items</span>
                   <span className="font-medium text-gray-900">{selectedItems.length}</span>
                 </div>
+
+                {/* Subtotal */}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium text-gray-900">{formatCurrency(selectedTotal)}</span>
                 </div>
+
+                {/* Shipping */}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Shipping</span>
                   <span className="font-medium text-green-600">Free</span>
                 </div>
+
+                {/* Tax */}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Tax (5%)</span>
                   <span className="font-medium text-gray-900">{formatCurrency(selectedTotal * 0.05)}</span>
                 </div>
               </div>
+
+              {/* Divider */}
               <div className="border-t-2 border-gray-300 pt-4 mb-6">
                 <div className="flex justify-between">
                   <span className="text-lg font-bold text-gray-900">Total</span>
-                  <span className="text-lg font-bold text-gray-900">{formatCurrency(selectedTotal * 1.05)}</span>
+                  <span className="text-lg font-bold text-gray-900">
+                    {formatCurrency(selectedTotal * 1.05)}
+                  </span>
                 </div>
               </div>
-              <button
-                onClick={handleCheckout}
-                disabled={selectedItems.length === 0}
-                className="w-full px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-3"
-              >
-                Checkout ({selectedItems.length})
-              </button>
-              <Link href="/products" className="block text-center text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                Continue Shopping
-              </Link>
+
+              {/* Buttons */}
+              <div className="space-y-3">
+                <button
+                  onClick={handleCheckout}
+                  disabled={selectedItems.length === 0}
+                  className="w-full px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Proceed to Checkout
+                </button>
+                <Link
+                  href="/products"
+                  className="block text-center px-6 py-3 border-2 border-black text-black rounded-lg font-semibold hover:bg-black hover:text-white transition-colors"
+                >
+                  Continue Shopping
+                </Link>
+              </div>
             </div>
           </div>
         )}
@@ -317,11 +440,17 @@ export default function CartPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm.itemId !== null && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4 shadow-xl">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Remove Item</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              {deleteConfirm.isDeleteAll ? 'Remove Items' : 'Remove Item'}
+            </h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to remove <span className="font-semibold">{deleteConfirm.itemName}</span> from your cart?
+              {deleteConfirm.isDeleteAll ? (
+                <>Are you sure you want to remove <span className="font-semibold">{deleteConfirm.itemName}</span> from your cart?</>
+              ) : (
+                <>Are you sure you want to remove <span className="font-semibold">{deleteConfirm.itemName}</span> ({deleteConfirm.size}) from your cart?</>
+              )}
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -331,7 +460,13 @@ export default function CartPage() {
                 Cancel
               </button>
               <button
-                onClick={() => handleConfirmDelete(deleteConfirm.itemId!)}
+                onClick={() => {
+                  if (deleteConfirm.isDeleteAll) {
+                    handleConfirmDeleteAll();
+                  } else {
+                    handleConfirmDelete(deleteConfirm.itemId!);
+                  }
+                }}
                 className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
               >
                 Delete

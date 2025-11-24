@@ -11,6 +11,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/contexts/ToastContext';
 import { motion } from 'framer-motion';
 import SizeSelectionModal from '@/components/SizeSelectionModal';
+import { useRouter } from 'next/navigation';
 
 interface Product {
   product_id: number;
@@ -37,9 +38,12 @@ export default function BestSellerSection() {
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [wishlistItems, setWishlistItems] = useState<number[]>([]);
+  const [wishlistMap, setWishlistMap] = useState<Map<number, number>>(new Map());
   const { user } = useAuth();
   const { addToCart } = useCart();
   const { showToast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     const fetchBestSellers = async () => {
@@ -62,7 +66,28 @@ export default function BestSellerSection() {
     };
 
     fetchBestSellers();
-  }, []);
+
+    // Fetch wishlist if user is logged in
+    if (user) {
+      const fetchWishlist = async () => {
+        try {
+          const wishlistResponse = await api.get('/wishlist');
+          const wishlistData = wishlistResponse.data.data || wishlistResponse.data;
+          const items = Array.isArray(wishlistData) ? wishlistData : [];
+          const productIds = items.map((item: any) => item.product_id);
+          const map = new Map<number, number>();
+          items.forEach((item: any) => {
+            map.set(item.product_id, item.wishlist_id);
+          });
+          setWishlistItems(productIds);
+          setWishlistMap(map);
+        } catch (error) {
+          // Wishlist fetch failed, continue without it
+        }
+      };
+      fetchWishlist();
+    }
+  }, [user]);
 
   const handleAddToCartClick = (product: Product) => {
     if (!user) {
@@ -75,6 +100,51 @@ export default function BestSellerSection() {
 
   const handleAddToCart = async (productId: number, size: '30ml' | '50ml', quantity: number) => {
     await addToCart(productId, size, quantity);
+  };
+
+  const handleWishlistToggle = async (productId: number) => {
+    if (!user) {
+      showToast('Please login to add items to wishlist', 'info');
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const isInWishlist = wishlistItems.includes(productId);
+      if (isInWishlist) {
+        const wishlistId = wishlistMap.get(productId);
+        if (wishlistId) {
+          await api.delete(`/wishlist/${wishlistId}`);
+          setWishlistItems(wishlistItems.filter((id) => id !== productId));
+          const newMap = new Map(wishlistMap);
+          newMap.delete(productId);
+          setWishlistMap(newMap);
+          showToast('Removed from wishlist', 'success');
+          
+          // Refresh navigation wishlist count
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('wishlist-updated'));
+          }
+        }
+      } else {
+        const response = await api.post('/wishlist', { product_id: productId });
+        const newItem = response.data;
+        setWishlistItems([...wishlistItems, productId]);
+        const newMap = new Map(wishlistMap);
+        if (newItem && newItem.wishlist_id) {
+          newMap.set(productId, newItem.wishlist_id);
+        }
+        setWishlistMap(newMap);
+        showToast('Added to wishlist', 'success');
+        
+        // Refresh navigation wishlist count
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('wishlist-updated'));
+        }
+      }
+    } catch (error: any) {
+      showToast(error.response?.data?.message || 'Failed to update wishlist', 'error');
+    }
   };
 
   if (loading) {
@@ -152,21 +222,20 @@ export default function BestSellerSection() {
 
                 {/* Wishlist Icon - White circle with black heart outline, aligned with Night tag */}
                 <div className="absolute top-4 right-4 z-10">
-                  {user ? (
-                    <Link
-                      href="/wishlist"
-                      className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
-                    >
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleWishlistToggle(product.product_id);
+                    }}
+                    className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  >
+                    {wishlistItems.includes(product.product_id) ? (
+                      <HeartIcon className="w-5 h-5 text-red-500" />
+                    ) : (
                       <HeartOutlineIcon className="w-5 h-5 text-black" strokeWidth={2} />
-                    </Link>
-                  ) : (
-                    <Link
-                      href="/login"
-                      className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
-                    >
-                      <HeartOutlineIcon className="w-5 h-5 text-black" strokeWidth={2} />
-                    </Link>
-                  )}
+                    )}
+                  </button>
                 </div>
 
                 {/* Product Image */}
