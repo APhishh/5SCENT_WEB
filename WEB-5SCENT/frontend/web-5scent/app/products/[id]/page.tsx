@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
+import TiltedCard from '@/components/TiltedCard';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
@@ -240,15 +241,22 @@ export default function ProductDetailPage() {
         <div className="grid md:grid-cols-2 gap-12 mb-16">
           {/* Product Gallery (Left Side) */}
           <div>
-            {/* Main Image */}
+            {/* Main Image with Tilted Card Effect */}
             <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden mb-4">
               {selectedImage && (
-                <Image
-                  src={selectedImage}
-                  alt={product.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
+                <TiltedCard
+                  imageSrc={selectedImage}
+                  altText={product.name}
+                  captionText={`${product.name} - ${selectedSize}`}
+                  containerHeight="100%"
+                  containerWidth="100%"
+                  imageHeight="100%"
+                  imageWidth="100%"
+                  rotateAmplitude={12}
+                  scaleOnHover={1.2}
+                  showMobileWarning={false}
+                  showTooltip={true}
+                  displayOverlayContent={false}
                 />
               )}
             </div>
