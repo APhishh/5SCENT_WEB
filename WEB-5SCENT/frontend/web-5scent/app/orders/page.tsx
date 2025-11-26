@@ -4,8 +4,8 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { SiHackthebox } from 'react-icons/si';
 import { GoPerson } from 'react-icons/go';
-import { FiPhone } from 'react-icons/fi';
-import { IoLocationOutline } from 'react-icons/io5';
+import { FiPhone, FiPackage, FiCopy } from 'react-icons/fi';
+import { IoLocationOutline, IoCopy } from 'react-icons/io5';
 import { IoMdStar, IoMdStarHalf, IoMdStarOutline } from 'react-icons/io';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
@@ -131,6 +131,7 @@ function OrderHistoryContent() {
   const [modalReviews, setModalReviews] = useState<Review[]>([]);
   const [allReviewedOrders, setAllReviewedOrders] = useState<Set<number>>(new Set());
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [hoveredCopyButton, setHoveredCopyButton] = useState<number | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -173,39 +174,15 @@ function OrderHistoryContent() {
         
         setOrders(ordersData);
         
-        // Check review status for all orders
-        const reviewedOrderIds = new Set<number>();
-        const allOrders = Object.values(ordersData).flat() as OrderData[];
-        
-        for (const order of allOrders) {
-          try {
-            if (!order || !order.order_id || !order.details) {
-              continue;
-            }
-            
-            // Only check reviews for non-cancelled orders
-            if (order.status === 'Cancelled') {
-              continue;
-            }
-            
-            try {
-              const reviewsResponse = await api.get(`/orders/${order.order_id}/reviews`);
-              const reviews = reviewsResponse.data || [];
-              const reviewedProductIds = new Set(reviews.map((r: Review) => r.product_id));
-              
-              // Check if all products in this order have been reviewed
-              if (order.details.every(item => reviewedProductIds.has(item.product_id))) {
-                reviewedOrderIds.add(order.order_id);
-              }
-            } catch (reviewError) {
-              // If reviews don't exist, order not fully reviewed
-            }
-          } catch (itemError) {
-            console.error(`Error processing order ${order?.order_id}:`, itemError);
-          }
+        // Lazy load review status - fetch after orders are displayed
+        try {
+          const reviewedResponse = await api.get('/ratings/reviewed-orders');
+          const fullyReviewedOrderIds = reviewedResponse.data?.fully_reviewed_order_ids || [];
+          setAllReviewedOrders(new Set(fullyReviewedOrderIds));
+        } catch (reviewError) {
+          console.error('Error fetching reviewed orders:', reviewError);
+          // Continue even if this fails
         }
-        
-        setAllReviewedOrders(reviewedOrderIds);
       } catch (error: any) {
         showToast('Failed to load orders', 'error');
         console.error(error);
@@ -259,22 +236,42 @@ function OrderHistoryContent() {
     const completed = Array.isArray(orders.completed) ? orders.completed : [];
     const canceled = Array.isArray(orders.canceled) ? orders.canceled : [];
     
+    let filtered: OrderData[] = [];
+    
     switch (activeTab) {
       case 'all':
-        return [...in_process, ...shipping, ...completed, ...canceled];
+        filtered = [...in_process, ...shipping, ...completed, ...canceled];
+        break;
       case 'pending':
-        return in_process.filter(o => o.status === 'Pending');
+        filtered = in_process.filter(o => o.status === 'Pending');
+        break;
       case 'packaging':
-        return in_process.filter(o => o.status === 'Packaging');
+        filtered = in_process.filter(o => o.status === 'Packaging');
+        break;
       case 'shipping':
-        return shipping;
+        filtered = shipping;
+        break;
       case 'delivered':
-        return completed;
+        filtered = completed;
+        break;
       case 'cancelled':
-        return canceled;
+        filtered = canceled;
+        break;
       default:
-        return [];
+        filtered = [];
     }
+    
+    // Sort by created_at descending to maintain order_id based sorting
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+      return dateB - dateA; // Descending order (newest first)
+    });
+  };
+
+  const copyTrackingNumber = (trackingNumber: string) => {
+    navigator.clipboard.writeText(trackingNumber);
+    showToast('Tracking number copied to clipboard', 'success');
   };
 
   const formatOrderDate = (dateString: string) => {
@@ -411,6 +408,40 @@ function OrderHistoryContent() {
         handleCloseConfirmation();
       } catch (error) {
         showToast('Failed to update order', 'error');
+        console.error(error);
+      } finally {
+        setConfirmLoading(false);
+      }
+    } else if (confirmationModal.type === 'cancel_order' && confirmed) {
+      try {
+        setConfirmLoading(true);
+        // Cancel the order using the cancel endpoint
+        await api.post(`/orders/${confirmationModal.order.order_id}/cancel`);
+        showToast('Order cancelled successfully!', 'success');
+        
+        // Refresh orders
+        const response = await api.get('/orders');
+        let ordersData: GroupedOrders;
+        if (Array.isArray(response.data)) {
+          ordersData = {
+            in_process: response.data.filter((o: OrderData) => ['Pending', 'Packaging'].includes(o.status)),
+            shipping: response.data.filter((o: OrderData) => o.status === 'Shipping'),
+            completed: response.data.filter((o: OrderData) => o.status === 'Delivered'),
+            canceled: response.data.filter((o: OrderData) => o.status === 'Cancelled'),
+          };
+        } else {
+          ordersData = {
+            in_process: Array.isArray(response.data.in_process) ? response.data.in_process : (response.data.in_process ? Object.values(response.data.in_process) : []),
+            shipping: Array.isArray(response.data.shipping) ? response.data.shipping : (response.data.shipping ? Object.values(response.data.shipping) : []),
+            completed: Array.isArray(response.data.completed) ? response.data.completed : (response.data.completed ? Object.values(response.data.completed) : []),
+            canceled: Array.isArray(response.data.canceled) ? response.data.canceled : (response.data.canceled ? Object.values(response.data.canceled) : []),
+          };
+        }
+        setOrders(ordersData);
+        handleCloseConfirmation();
+      } catch (error: any) {
+        const errorMessage = error.response?.data?.message || 'Failed to cancel order';
+        showToast(errorMessage, 'error');
         console.error(error);
       } finally {
         setConfirmLoading(false);
@@ -577,6 +608,29 @@ function OrderHistoryContent() {
                   </div>
                 </div>
 
+                {/* Tracking Row - Show for Shipping and Delivered orders with tracking number */}
+                {order.tracking_number && (order.status === 'Shipping' || order.status === 'Delivered') && (
+                  <div className="flex items-center gap-2 mb-6">
+                    <FiPackage className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                    <span className="text-sm text-gray-700">
+                      Tracking: <span className="font-semibold">{order.tracking_number}</span>
+                    </span>
+                    <button
+                      onClick={() => copyTrackingNumber(order.tracking_number!)}
+                      onMouseEnter={() => setHoveredCopyButton(order.order_id)}
+                      onMouseLeave={() => setHoveredCopyButton(null)}
+                      className="text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
+                      title="Copy tracking number"
+                    >
+                      {hoveredCopyButton === order.order_id ? (
+                        <IoCopy className="w-4 h-4" />
+                      ) : (
+                        <FiCopy className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 {/* Products List */}
                 <div className="mb-6">
                   {order.details.map((item) => (
@@ -646,7 +700,7 @@ function OrderHistoryContent() {
                       >
                         Mark as Received
                       </button>
-                    ) : (
+                    ) : order.status === 'Delivered' ? (
                       <button
                         onClick={() => handleOpenReview(order)}
                         className="flex-1 px-4 py-2.5 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-800 transition-colors"
@@ -654,7 +708,7 @@ function OrderHistoryContent() {
                       >
                         {allReviewedOrders.has(order.order_id) ? 'Edit Review' : 'Give Review'}
                       </button>
-                    )}
+                    ) : null}
                   </div>
                   {order.status === 'Pending' && (
                     <button
@@ -723,6 +777,33 @@ function OrderHistoryContent() {
                       <p className="text-sm text-gray-700">{modal.order.shipping_address}</p>
                     </div>
                   </div>
+
+                  {/* Tracking Information - Show only if tracking_number exists */}
+                  {modal.order.tracking_number && (
+                    <div className="bg-gray-100 rounded-2xl p-6">
+                      <h3 className="text-base font-semibold text-gray-900 mb-4">Tracking Information</h3>
+                      <div className="flex items-center gap-2">
+                        <FiPackage className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-600">Tracking Number</p>
+                          <p className="text-sm font-semibold text-gray-900">{modal.order.tracking_number}</p>
+                        </div>
+                        <button
+                          onClick={() => copyTrackingNumber(modal.order!.tracking_number!)}
+                          onMouseEnter={() => setHoveredCopyButton(modal.order!.order_id)}
+                          onMouseLeave={() => setHoveredCopyButton(null)}
+                          className="text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
+                          title="Copy tracking number"
+                        >
+                          {hoveredCopyButton === modal.order!.order_id ? (
+                            <IoCopy className="w-4 h-4" />
+                          ) : (
+                            <FiCopy className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Order Items */}
                   <div className="bg-gray-100 rounded-2xl p-6">

@@ -53,6 +53,6 @@ class Order extends Model
 
     public function canBeCancelled()
     {
-        return $this->status === 'Packaging';
+        return $this->status === 'Pending' || $this->status === 'Packaging';
     }
 }

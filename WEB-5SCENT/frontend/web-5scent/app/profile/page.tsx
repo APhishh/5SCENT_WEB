@@ -10,6 +10,7 @@ import api from '@/lib/api';
 import { User, Mail, Phone, MapPin, Lock, Eye, EyeOff, Upload } from 'lucide-react';
 import ProfileCropModal from '@/components/ProfileCropModal';
 import ScrollAnimated from '@/components/ScrollAnimated';
+import { Trash2Icon } from '@/components/Trash2Icon';
 
 // Password validation helper
 function validatePassword(password: string): string | null {
@@ -92,6 +93,8 @@ export default function ProfilePage() {
     new: false,
     confirm: false,
   });
+
+  const [isRemoveButtonHovered, setIsRemoveButtonHovered] = useState(false);
 
   useEffect(() => {
     // Wait for auth to finish loading before checking user
@@ -177,7 +180,7 @@ export default function ProfilePage() {
       const file = new File([blob], `profile-pic${extension}`, { type: blob.type });
       
       // Get user ID
-      const userId = user?.user_id?.toString() || user?.id?.toString();
+      const userId = user?.user_id?.toString();
       if (!userId) {
         showToast('User ID not available', 'error');
         setLoading(false);
@@ -185,10 +188,17 @@ export default function ProfilePage() {
         return;
       }
       
-      // Get old filename if exists
+      // Get old filename if exists - support both filename and full path formats
       let oldFilename: string | null = null;
-      if (user?.profile_pic && user.profile_pic.includes('profile_pics')) {
-        oldFilename = user.profile_pic.split('/').pop() || null;
+      if (user?.profile_pic) {
+        // Extract just the filename if it's a full path
+        if (user.profile_pic.includes('/')) {
+          oldFilename = user.profile_pic.split('/').pop() || null;
+        } else {
+          // It's already just the filename
+          oldFilename = user.profile_pic;
+        }
+        console.log('Old filename to delete:', oldFilename);
       }
       
       // Upload profile picture immediately
@@ -359,7 +369,22 @@ export default function ProfilePage() {
 
     setLoading(true);
     try {
-      // Call backend to remove profile picture
+      // Delete file from filesystem first
+      if (user?.profile_pic) {
+        const filename = user.profile_pic.includes('/') 
+          ? user.profile_pic.split('/').pop() 
+          : user.profile_pic;
+        
+        if (filename) {
+          await fetch('/api/delete-profile-pic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename }),
+          });
+        }
+      }
+
+      // Call backend to remove profile picture from database
       await api.delete('/profile/picture');
       
       // Update local state
@@ -447,28 +472,34 @@ export default function ProfilePage() {
               <h2 className="text-xl font-header font-bold text-gray-900 mb-1">{user.name}</h2>
               <p className="text-sm text-gray-600 mb-4 font-body">{user.email}</p>
 
-              {/* Change Photo Button */}
-              <label className="inline-flex items-center gap-2 px-5 py-2 bg-black text-white rounded-full font-semibold hover:bg-gray-800 transition-colors cursor-pointer font-body text-sm">
-                <Upload className="w-4 h-4" />
-                Change Photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
+              {/* Photo Action Buttons */}
+              <div className="flex flex-col gap-3 w-full">
+                {/* Change Photo Button */}
+                <label className="w-full flex items-center justify-center gap-2 px-5 py-2 bg-white text-black rounded-full font-semibold hover:bg-gray-50 transition-colors cursor-pointer font-body text-sm border border-black border-opacity-10">
+                  <Upload className="w-4 h-4 text-black" />
+                  Change Photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </label>
 
-              {/* Remove Photo Button - only show if profile picture exists */}
-              {preview && (
-                <button
-                  onClick={handleRemovePhoto}
-                  disabled={loading}
-                  className="inline-flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors font-body text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Remove Photo
-                </button>
-              )}
+                {/* Remove Photo Button - only show if profile picture exists */}
+                {preview && (
+                  <button
+                    onClick={handleRemovePhoto}
+                    disabled={loading}
+                    onMouseEnter={() => setIsRemoveButtonHovered(true)}
+                    onMouseLeave={() => setIsRemoveButtonHovered(false)}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-2 bg-black text-white rounded-full font-semibold hover:bg-gray-800 transition-colors font-body text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2Icon size={18} isAnimated={isRemoveButtonHovered} />
+                    Remove Photo
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

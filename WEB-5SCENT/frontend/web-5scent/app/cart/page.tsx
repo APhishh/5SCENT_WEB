@@ -60,7 +60,7 @@ export default function CartPage() {
         groups[productId] = {
           productId,
           productName: item.product.name,
-          category: item.product.category,
+          category: (item.product as any).category,
           images: [],
           sizes: [],
           cartItems: [],

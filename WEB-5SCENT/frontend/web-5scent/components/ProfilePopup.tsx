@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { XMarkIcon, Cog6ToothIcon, CubeIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, Cog6ToothIcon, CubeIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { LogoutIcon } from './LogoutIcon';
 
 interface ProfilePopupProps {
   onClose: () => void;
@@ -16,6 +17,8 @@ export default function ProfilePopup({ onClose }: ProfilePopupProps) {
   const router = useRouter();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLogoutButtonHovered, setIsLogoutButtonHovered] = useState(false);
+  const logoutIconRef = useRef<any>(null);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -176,10 +179,16 @@ export default function ProfilePopup({ onClose }: ProfilePopupProps) {
             {/* Logout */}
             <button
               onClick={handleLogout}
+              onMouseEnter={() => setIsLogoutButtonHovered(true)}
+              onMouseLeave={() => setIsLogoutButtonHovered(false)}
               className="w-full px-6 py-4 flex items-center gap-4 hover:bg-red-50 transition-colors text-left group"
             >
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center group-hover:bg-red-200 transition-colors">
-                <ArrowRightOnRectangleIcon className="w-5 h-5 text-red-600" />
+                <LogoutIcon 
+                  ref={logoutIconRef}
+                  size={20}
+                  isAnimated={isLogoutButtonHovered}
+                />
               </div>
               <div className="flex-1">
                 <h4 className="font-semibold text-red-600 font-body">Logout</h4>

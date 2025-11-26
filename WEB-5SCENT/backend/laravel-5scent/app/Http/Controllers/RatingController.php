@@ -60,6 +60,42 @@ class RatingController extends Controller
         return response()->json($reviews);
     }
 
+    public function getFullyReviewedOrders(Request $request)
+    {
+        $user = $request->user();
+
+        // Get all orders with their details for this user
+        $orders = Order::with('details')
+            ->where('user_id', $user->user_id)
+            ->where('status', 'Delivered')
+            ->get();
+
+        // Get all ratings for this user
+        $ratings = Rating::where('user_id', $user->user_id)
+            ->get(['product_id', 'order_id']);
+
+        $reviewedProductsByOrder = [];
+        foreach ($ratings as $rating) {
+            if (!isset($reviewedProductsByOrder[$rating->order_id])) {
+                $reviewedProductsByOrder[$rating->order_id] = [];
+            }
+            $reviewedProductsByOrder[$rating->order_id][] = $rating->product_id;
+        }
+
+        // Check which orders have all products reviewed
+        $fullyReviewedOrderIds = [];
+        foreach ($orders as $order) {
+            $reviewedProducts = $reviewedProductsByOrder[$order->order_id] ?? [];
+            $orderProductIds = $order->details->pluck('product_id')->toArray();
+            
+            if (!empty($orderProductIds) && count(array_intersect($reviewedProducts, $orderProductIds)) === count($orderProductIds)) {
+                $fullyReviewedOrderIds[] = $order->order_id;
+            }
+        }
+
+        return response()->json(['fully_reviewed_order_ids' => $fullyReviewedOrderIds]);
+    }
+
     public function update($ratingId, Request $request)
     {
         $validated = $request->validate([

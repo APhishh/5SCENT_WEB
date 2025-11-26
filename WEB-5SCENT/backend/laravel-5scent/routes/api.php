@@ -70,6 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Ratings
     Route::post('/ratings', [RatingController::class, 'store']);
     Route::put('/ratings/{id}', [RatingController::class, 'update']);
+    Route::get('/ratings/reviewed-orders', [RatingController::class, 'getFullyReviewedOrders']);
 
     // Payment
     Route::post('/payments/qris', [PaymentController::class, 'createQrisPayment']);

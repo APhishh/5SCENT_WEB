@@ -105,6 +105,9 @@ class ProfileController extends Controller
 
         $user->update($updateData);
         
+        // Touch updated_at timestamp
+        $user->touch();
+        
         // Refresh the user model to get updated data
         $user->refresh();
 
@@ -171,6 +174,9 @@ class ProfileController extends Controller
 
         // Set profile_pic to null
         $user->update(['profile_pic' => null]);
+        
+        // Touch updated_at timestamp
+        $user->touch();
 
         return response()->json(['message' => 'Profile picture removed successfully']);
     }

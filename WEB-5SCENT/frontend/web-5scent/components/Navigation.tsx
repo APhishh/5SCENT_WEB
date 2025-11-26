@@ -1,11 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { ShoppingCartIcon, HeartIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect, useRef } from 'react';
+import { HeartIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import ProfilePopup from './ProfilePopup';
+import { ShoppingCartIcon } from './ShoppingCartIcon';
+import { LogoutIcon } from './LogoutIcon';
 import api from '@/lib/api';
 
 export default function Navigation() {
@@ -13,6 +15,8 @@ export default function Navigation() {
   const { items } = useCart();
   const [showProfile, setShowProfile] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [isCartAnimating, setIsCartAnimating] = useState(false);
+  const cartIconRef = useRef<any>(null);
 
   const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -27,12 +31,15 @@ export default function Navigation() {
   useEffect(() => {
     const handleWishlistUpdate = () => {
       if (user) {
-        fetchWishlistCount();
+        fetchWishlistUpdate();
       }
     };
 
     const handleCartUpdate = () => {
-      // Cart count is automatically updated via CartContext
+      // Trigger cart animation when cart is updated
+      if (cartIconRef.current) {
+        cartIconRef.current.startAnimation();
+      }
     };
 
     window.addEventListener('wishlist-updated', handleWishlistUpdate);
@@ -51,6 +58,17 @@ export default function Navigation() {
       setWishlistCount(items.length);
     } catch (error) {
       // Wishlist fetch failed, set to 0
+      setWishlistCount(0);
+    }
+  };
+
+  const fetchWishlistUpdate = async () => {
+    try {
+      const response = await api.get('/wishlist');
+      const wishlistData = response.data.data || response.data;
+      const items = Array.isArray(wishlistData) ? wishlistData : [];
+      setWishlistCount(items.length);
+    } catch (error) {
       setWishlistCount(0);
     }
   };
@@ -109,7 +127,11 @@ export default function Navigation() {
                     className="relative p-2 text-gray-700 hover:text-primary-600 transition-colors"
                     id="cart-icon"
                   >
-                    <ShoppingCartIcon className="w-6 h-6" />
+                    <ShoppingCartIcon 
+                      ref={cartIconRef}
+                      size={24}
+                      isAnimated={true}
+                    />
                     {cartItemCount > 0 && (
                       <span className="absolute top-0 right-0 bg-black text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
                         {cartItemCount}
