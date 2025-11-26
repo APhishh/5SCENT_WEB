@@ -39,6 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Profile
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::post('/profile/change-password', [ProfileController::class, 'changePassword']);
+    Route::delete('/profile/picture', [ProfileController::class, 'deleteProfilePicture']);
 
     // Cart
     Route::prefix('cart')->group(function () {
@@ -60,6 +61,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/', [OrderController::class, 'index']);
         Route::post('/', [OrderController::class, 'store']);
         Route::get('/{id}', [OrderController::class, 'show']);
+        Route::put('/{id}', [OrderController::class, 'update']);
         Route::post('/{id}/cancel', [OrderController::class, 'cancel']);
         Route::post('/{id}/finish', [OrderController::class, 'finish']);
         Route::get('/{id}/reviews', [RatingController::class, 'getOrderReviews']);

@@ -21,7 +21,7 @@ class ProfileController extends Controller
             'province' => 'nullable|string|max:255',
             'postal_code' => 'nullable|string|max:20',
             'profile_pic' => 'nullable|image|mimes:jpeg,png,jpg',
-            'profile_pic_path' => 'nullable|string|max:500',
+            'profile_pic_filename' => 'nullable|string|max:500',
         ];
         
         // Only validate phone regex if phone is provided and not empty
@@ -35,8 +35,8 @@ class ProfileController extends Controller
             'phone.regex' => 'Phone number must start with +62 and have at least 8 digits after the country code.',
             'profile_pic.image' => 'The profile picture must be an image file.',
             'profile_pic.mimes' => 'Only JPG and PNG image files are allowed for profile photos.',
-            'profile_pic_path.string' => 'The profile picture path must be a valid string.',
-            'profile_pic_path.max' => 'The profile picture path is too long.',
+            'profile_pic_filename.string' => 'The profile picture filename must be a valid string.',
+            'profile_pic_filename.max' => 'The profile picture filename is too long.',
         ];
 
         try {
@@ -86,25 +86,21 @@ class ProfileController extends Controller
             
             $path = $file->store('profiles', 'public');
             $updateData['profile_pic'] = $path;
-        } elseif ($request->has('profile_pic_path') && $request->filled('profile_pic_path')) {
-            // Use path from Next.js upload (saved to public/profile_pics)
-            // Validate the path format
-            $path = $validated['profile_pic_path'];
-            if (!str_starts_with($path, 'profile_pics/')) {
+        } elseif ($request->has('profile_pic_filename') && $request->filled('profile_pic_filename')) {
+            // Use filename from Next.js upload (saved to public/profile_pics)
+            // Store only the filename, not the full path
+            $filename = $validated['profile_pic_filename'];
+            
+            // Validate filename format (must be user_id_timestamp.ext)
+            if (!preg_match('/^\d+_\d{12}\.(jpg|jpeg|png)$/i', $filename)) {
                 return response()->json([
-                    'message' => 'Invalid profile picture path format.',
-                    'errors' => ['profile_pic_path' => ['Invalid profile picture path format.']]
+                    'message' => 'Invalid profile picture filename format.',
+                    'errors' => ['profile_pic_filename' => ['Invalid profile picture filename format.']]
                 ], 422);
             }
             
-            // Extract filename to check if old file should be deleted
-            $filename = basename($path);
-            if ($user->profile_pic && str_contains($user->profile_pic, 'profile_pics')) {
-                $oldFilename = basename($user->profile_pic);
-                // Old file deletion is handled by Next.js upload route
-            }
-            
-            $updateData['profile_pic'] = $path;
+            // Store only filename - frontend will prepend /profile_pics/
+            $updateData['profile_pic'] = $filename;
         }
 
         $user->update($updateData);
@@ -158,5 +154,24 @@ class ProfileController extends Controller
         ]);
 
         return response()->json(['message' => 'Password changed successfully']);
+    }
+
+    public function deleteProfilePicture(Request $request)
+    {
+        $user = $request->user();
+
+        // Delete file if it's in profile_pics directory
+        if ($user->profile_pic) {
+            if (!str_contains($user->profile_pic, 'profile_pics')) {
+                // Old Laravel storage file
+                Storage::disk('public')->delete($user->profile_pic);
+            }
+            // Note: Next.js public files can be manually deleted from filesystem if needed
+        }
+
+        // Set profile_pic to null
+        $user->update(['profile_pic' => null]);
+
+        return response()->json(['message' => 'Profile picture removed successfully']);
     }
 }

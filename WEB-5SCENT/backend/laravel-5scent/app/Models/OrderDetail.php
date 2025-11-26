@@ -11,6 +11,7 @@ class OrderDetail extends Model
 
     protected $table = 'orderdetail';
     protected $primaryKey = 'order_detail_id';
+    public $timestamps = false;
 
     protected $fillable = [
         'order_id',
@@ -18,6 +19,7 @@ class OrderDetail extends Model
         'size',
         'quantity',
         'price',
+        'subtotal',
     ];
 
     protected function casts(): array

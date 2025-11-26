@@ -38,7 +38,7 @@ class OrderController extends Controller
                     break;
                 case 'cancel':
                 case 'cancelled':
-                    $ordersQuery->where('status', 'Cancel');
+                    $ordersQuery->where('status', 'Cancelled');
                     break;
                 default:
                     // If an unknown status is provided, fall back to all orders
@@ -51,10 +51,10 @@ class OrderController extends Controller
         $orders = $ordersQuery->get();
 
         $grouped = [
-            'in_process' => $orders->whereIn('status', ['Pending', 'Packaging']),
-            'shipping' => $orders->where('status', 'Shipping'),
-            'completed' => $orders->where('status', 'Delivered'),
-            'canceled' => $orders->where('status', 'Cancel'),
+            'in_process' => $orders->whereIn('status', ['Pending', 'Packaging'])->values()->all(),
+            'shipping' => $orders->where('status', 'Shipping')->values()->all(),
+            'completed' => $orders->where('status', 'Delivered')->values()->all(),
+            'canceled' => $orders->where('status', 'Cancelled')->values()->all(),
         ];
 
         return response()->json($grouped);
@@ -104,6 +104,8 @@ class OrderController extends Controller
             $price = $cartItem->size === '30ml' 
                 ? $cartItem->product->price_30ml 
                 : $cartItem->product->price_50ml;
+            
+            $subtotal = $price * $cartItem->quantity;
 
             OrderDetail::create([
                 'order_id' => $order->order_id,
@@ -111,6 +113,7 @@ class OrderController extends Controller
                 'size' => $cartItem->size,
                 'quantity' => $cartItem->quantity,
                 'price' => $price,
+                'subtotal' => $subtotal,
             ]);
 
             // Update stock
@@ -176,5 +179,21 @@ class OrderController extends Controller
         $order->update(['status' => 'Delivered']);
 
         return response()->json(['message' => 'Order finished successfully']);
+    }
+
+    public function update($id, Request $request)
+    {
+        $order = Order::where('user_id', $request->user()->user_id)
+            ->findOrFail($id);
+
+        $validated = $request->validate([
+            'status' => 'sometimes|in:Pending,Packaging,Shipping,Delivered,Cancelled',
+        ]);
+
+        if (isset($validated['status'])) {
+            $order->update(['status' => $validated['status']]);
+        }
+
+        return response()->json($order->load('details.product.images', 'payment'));
     }
 }

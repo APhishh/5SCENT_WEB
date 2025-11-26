@@ -21,6 +21,17 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Invalid payment method'], 400);
         }
 
+        // Check if Midtrans is configured
+        $serverKey = config('midtrans.server_key');
+        if (!$serverKey) {
+            // Return mock response for development/testing without Midtrans credentials
+            return response()->json([
+                'token' => 'mock-snap-token-' . $order->order_id,
+                'redirect_url' => null,
+                'message' => 'Payment gateway not configured. Using mock mode.',
+            ]);
+        }
+
         // Midtrans integration
         $midtransOrderId = 'MID-' . time() . '-' . $order->order_id;
         
@@ -48,7 +59,6 @@ class PaymentController extends Controller
         ];
 
         // Call Midtrans API
-        $serverKey = config('midtrans.server_key');
         $isProduction = config('midtrans.is_production');
         $baseUrl = $isProduction 
             ? 'https://app.midtrans.com/snap/v1' 

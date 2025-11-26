@@ -13,6 +13,15 @@ import { formatCurrency } from '@/lib/utils';
 import Image from 'next/image';
 import { ArrowLeftIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
+// Extend window type for Midtrans Snap
+declare global {
+  interface Window {
+    snap?: {
+      pay: (token: string, options: any) => void;
+    };
+  }
+}
+
 interface FormData {
   fullName: string;
   phoneNumber: string;
@@ -143,12 +152,9 @@ function CheckoutContent() {
 
     setLoading(true);
     try {
-      const fullPhone = `+62${formData.phoneNumber}`;
       const response = await api.post('/orders', {
         cart_ids: selectedItemIds,
-        customer_name: formData.fullName,
-        phone_number: fullPhone,
-        address: `${formData.addressLine}, ${formData.district}, ${formData.city}, ${formData.province}, ${formData.postalCode}`,
+        shipping_address: `${formData.addressLine}, ${formData.district}, ${formData.city}, ${formData.province} ${formData.postalCode}`,
         payment_method: paymentMethod,
       });
 
@@ -162,10 +168,14 @@ function CheckoutContent() {
         if (paymentResponse.data.redirect_url) {
           window.location.href = paymentResponse.data.redirect_url;
         } else if (paymentResponse.data.token) {
-          // Use Midtrans Snap
-          // @ts-ignore
-          if (window.snap) {
-            // @ts-ignore
+          // Check if it's a mock token (for development without Midtrans credentials)
+          if (paymentResponse.data.token.startsWith('mock-')) {
+            // Mock mode - just complete the order
+            showToast('Order placed successfully (Mock Payment)', 'success');
+            refreshCart();
+            router.push('/orders');
+          } else if (window.snap) {
+            // Use Midtrans Snap
             window.snap.pay(paymentResponse.data.token, {
               onSuccess: () => {
                 showToast('Payment successful', 'success');
@@ -180,7 +190,14 @@ function CheckoutContent() {
                 showToast('Payment failed', 'error');
               },
             });
+          } else {
+            // Midtrans Snap not loaded, but we have a token
+            showToast('Payment gateway not available. Order placed.', 'info');
+            refreshCart();
+            router.push('/orders');
           }
+        } else {
+          showToast('Unable to process payment', 'error');
         }
       } else {
         showToast('Order placed successfully', 'success');

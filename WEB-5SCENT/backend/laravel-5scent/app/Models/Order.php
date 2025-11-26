@@ -11,6 +11,7 @@ class Order extends Model
 
     protected $table = 'orders';
     protected $primaryKey = 'order_id';
+    public $timestamps = false;
 
     protected $fillable = [
         'user_id',

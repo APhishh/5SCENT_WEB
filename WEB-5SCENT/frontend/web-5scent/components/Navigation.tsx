@@ -128,9 +128,9 @@ export default function Navigation() {
                         src={
                           user.profile_pic.startsWith('http')
                             ? user.profile_pic
-                            : user.profile_pic.includes('profile_pics')
+                            : user.profile_pic.includes('/')
                             ? `/profile_pics/${user.profile_pic.split('/').pop()}`
-                            : `http://localhost:8000/storage/${user.profile_pic}`
+                            : `/profile_pics/${user.profile_pic}`
                         }
                         alt={user.name}
                         className="w-full h-full object-cover"
