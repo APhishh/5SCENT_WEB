@@ -117,11 +117,14 @@ export default function ProfilePage() {
     // Set profile picture preview
     if (user.profile_pic) {
       if (user.profile_pic.startsWith('http')) {
+        // Full URL from external source
         setPreview(user.profile_pic);
-      } else if (user.profile_pic.includes('profile_pics')) {
+      } else if (user.profile_pic.includes('/')) {
+        // Path with directory - construct relative path
         setPreview(`/profile_pics/${user.profile_pic.split('/').pop()}`);
       } else {
-        setPreview(`http://localhost:8000/storage/${user.profile_pic}`);
+        // Just filename - prepend /profile_pics/
+        setPreview(`/profile_pics/${user.profile_pic}`);
       }
     }
   }, [user, router, authLoading]);
@@ -173,8 +176,14 @@ export default function ProfilePage() {
       const extension = blob.type.includes('png') ? '.png' : '.jpg';
       const file = new File([blob], `profile-pic${extension}`, { type: blob.type });
       
-      // Get username from user data
-      const username = user?.name || 'user';
+      // Get user ID
+      const userId = user?.user_id?.toString() || user?.id?.toString();
+      if (!userId) {
+        showToast('User ID not available', 'error');
+        setLoading(false);
+        setShowCropModal(false);
+        return;
+      }
       
       // Get old filename if exists
       let oldFilename: string | null = null;
@@ -185,7 +194,7 @@ export default function ProfilePage() {
       // Upload profile picture immediately
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
-      uploadFormData.append('username', username);
+      uploadFormData.append('userId', userId);
       if (oldFilename) {
         uploadFormData.append('oldFilename', oldFilename);
       }
@@ -201,11 +210,12 @@ export default function ProfilePage() {
       }
       
       const uploadData = await uploadResponse.json();
-      const profilePicPath = uploadData.path;
+      const filename = uploadData.filename;
       
       // Update profile picture in backend immediately - include required fields
+      // Store only the filename in the database, not the full path
       const submitData = new FormData();
-      submitData.append('profile_pic_path', profilePicPath);
+      submitData.append('profile_pic_filename', filename);
       submitData.append('name', formData.name);
       submitData.append('email', formData.email);
       if (formData.phone) {
@@ -226,9 +236,9 @@ export default function ProfilePage() {
       updateUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
       
-      // Update local state
+      // Update local state with proper relative path
       setProfilePicture(file);
-      setPreview(`/profile_pics/${uploadData.filename}`);
+      setPreview(`/profile_pics/${filename}`);
       
       showToast('Profile picture updated successfully', 'success');
     } catch (error: any) {
@@ -294,10 +304,10 @@ export default function ProfilePage() {
       if (updatedUser.profile_pic) {
         if (updatedUser.profile_pic.startsWith('http')) {
           setPreview(updatedUser.profile_pic);
-        } else if (updatedUser.profile_pic.includes('profile_pics')) {
+        } else if (updatedUser.profile_pic.includes('/')) {
           setPreview(`/profile_pics/${updatedUser.profile_pic.split('/').pop()}`);
         } else {
-          setPreview(`http://localhost:8000/storage/${updatedUser.profile_pic}`);
+          setPreview(`/profile_pics/${updatedUser.profile_pic}`);
         }
       }
       
@@ -339,6 +349,33 @@ export default function ProfilePage() {
       setPasswordData({ current_password: '', password: '', password_confirmation: '' });
     } catch (error: any) {
       showToast(error.response?.data?.message || 'Failed to change password', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!preview) return;
+
+    setLoading(true);
+    try {
+      // Call backend to remove profile picture
+      await api.delete('/profile/picture');
+      
+      // Update local state
+      setPreview(null);
+      setProfilePicture(null);
+      
+      // Refresh user data
+      const meResponse = await api.get('/me');
+      const updatedUser = meResponse.data;
+      updateUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      showToast('Profile picture removed successfully', 'success');
+    } catch (error: any) {
+      console.error('Error removing profile picture:', error);
+      showToast(error.response?.data?.message || 'Failed to remove profile picture', 'error');
     } finally {
       setLoading(false);
     }
@@ -421,6 +458,17 @@ export default function ProfilePage() {
                   className="hidden"
                 />
               </label>
+
+              {/* Remove Photo Button - only show if profile picture exists */}
+              {preview && (
+                <button
+                  onClick={handleRemovePhoto}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-red-600 text-white rounded-full font-semibold hover:bg-red-700 transition-colors font-body text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Remove Photo
+                </button>
+              )}
             </div>
           </div>
 
@@ -456,10 +504,10 @@ export default function ProfilePage() {
                       if (user.profile_pic) {
                         if (user.profile_pic.startsWith('http')) {
                           setPreview(user.profile_pic);
-                        } else if (user.profile_pic.includes('profile_pics')) {
+                        } else if (user.profile_pic.includes('/')) {
                           setPreview(`/profile_pics/${user.profile_pic.split('/').pop()}`);
                         } else {
-                          setPreview(`http://localhost:8000/storage/${user.profile_pic}`);
+                          setPreview(`/profile_pics/${user.profile_pic}`);
                         }
                       }
                     }}

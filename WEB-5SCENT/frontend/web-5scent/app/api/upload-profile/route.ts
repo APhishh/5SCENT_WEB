@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const username = formData.get('username') as string;
+    const userId = formData.get('userId') as string;
     const oldFilename = formData.get('oldFilename') as string | null;
 
     if (!file) {
@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (!username) {
-      return NextResponse.json({ error: 'Username is required' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       await mkdir(profilePicsDir, { recursive: true });
     }
 
-    // Generate filename: username_HHMMDDMMYYYY.ext
+    // Generate filename: user_id_HHMMDDMMYYYY.ext
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -54,9 +54,8 @@ export async function POST(request: NextRequest) {
     const year = String(now.getFullYear());
     const timestampdate = `${hours}${minutes}${day}${month}${year}`;
     
-    // Clean username (remove special characters, spaces)
-    const cleanUsername = username.toLowerCase().replace(/[^a-z0-9]/g, '_');
-    const filename = `${cleanUsername}_${timestampdate}${extension}`;
+    // Use user ID directly
+    const filename = `${userId}_${timestampdate}${extension}`;
     const filepath = join(profilePicsDir, filename);
 
     // Delete old file if it exists and is different

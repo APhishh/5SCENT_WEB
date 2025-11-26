@@ -11,6 +11,7 @@ class Payment extends Model
 
     protected $table = 'payment';
     protected $primaryKey = 'payment_id';
+    public $timestamps = false;
 
     protected $fillable = [
         'order_id',

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Rating;
 use App\Models\Order;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
 
 class RatingController extends Controller
 {
@@ -38,16 +37,12 @@ class RatingController extends Controller
             ], 400);
         }
 
-        $now = Carbon::now();
-
         $rating = Rating::create([
             'user_id' => $request->user()->user_id,
             'product_id' => $validated['product_id'],
             'order_id' => $validated['order_id'],
             'stars' => $validated['stars'],
             'comment' => $validated['comment'] ?? null,
-            'created_at' => $now,
-            'updated_at' => $now,
         ]);
 
         return response()->json($rating->load('user'), 201);
@@ -84,7 +79,6 @@ class RatingController extends Controller
         $rating->update([
             'stars' => $validated['stars'],
             'comment' => $validated['comment'] ?? $rating->comment,
-            'updated_at' => Carbon::now(),
         ]);
 
         return response()->json($rating, 200);
