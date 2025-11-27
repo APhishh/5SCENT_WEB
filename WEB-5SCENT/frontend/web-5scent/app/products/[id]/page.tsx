@@ -11,8 +11,10 @@ import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/contexts/ToastContext';
-import { HeartIcon as HeartOutlineIcon, HeartIcon as HeartSolidIcon, ShoppingCartIcon, StarIcon } from '@heroicons/react/24/outline';
+import { HeartIcon as HeartOutlineIcon, HeartIcon as HeartSolidIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
+import { FaStar, FaRegStar, FaRegStarHalfStroke } from 'react-icons/fa6';
+import { roundRating } from '@/lib/utils';
 
 interface Product {
   product_id: number;
@@ -306,17 +308,40 @@ export default function ProductDetailPage() {
             {/* Rating Summary */}
             {averageRating > 0 && (
               <div className="flex items-center gap-2 mb-6">
-                <div className="flex">
-                  {[...Array(5)].map((_, i) => (
-                    <StarIcon
-                      key={i}
-                      className={`w-5 h-5 ${
-                        i < Math.round(averageRating)
-                          ? 'text-black fill-black'
-                          : 'text-[#BDBDBD] fill-[#BDBDBD]'
-                      }`}
-                    />
-                  ))}
+                <div className="flex gap-0.5">
+                  {[...Array(5)].map((_, i) => {
+                    const roundedRating = roundRating(averageRating);
+                    const hasHalfStar = Math.abs(roundedRating - Math.floor(roundedRating) - 0.5) < 0.01;
+                    const starPosition = i;
+                    
+                    // Full star
+                    if (starPosition < Math.floor(roundedRating)) {
+                      return (
+                        <FaStar
+                          key={i}
+                          className="w-5 h-5 text-black"
+                        />
+                      );
+                    }
+                    
+                    // Half star
+                    if (hasHalfStar && starPosition === Math.floor(roundedRating)) {
+                      return (
+                        <FaRegStarHalfStroke
+                          key={i}
+                          className="w-5 h-5 text-black"
+                        />
+                      );
+                    }
+                    
+                    // Empty star
+                    return (
+                      <FaRegStar
+                        key={i}
+                        className="w-5 h-5 text-black"
+                      />
+                    );
+                  })}
                 </div>
                 <span className="text-base text-gray-700 font-body">
                   {averageRating.toFixed(1)} ({ratingCount} {ratingCount === 1 ? 'review' : 'reviews'})
@@ -508,17 +533,40 @@ export default function ProductDetailPage() {
                         </div>
                         
                         {/* Star Rating */}
-                        <div className="flex items-center gap-1 mb-3">
-                          {[...Array(5)].map((_, i) => (
-                            <StarIcon
-                              key={i}
-                              className={`w-4 h-4 ${
-                                i < rating.stars
-                                  ? 'text-black fill-black'
-                                  : 'text-[#BDBDBD] fill-[#BDBDBD]'
-                              }`}
-                            />
-                          ))}
+                        <div className="flex items-center gap-0.5 mb-3">
+                          {[...Array(5)].map((_, i) => {
+                            const roundedRating = roundRating(rating.stars);
+                            const hasHalfStar = Math.abs(roundedRating - Math.floor(roundedRating) - 0.5) < 0.01;
+                            const starPosition = i;
+                            
+                            // Full star
+                            if (starPosition < Math.floor(roundedRating)) {
+                              return (
+                                <FaStar
+                                  key={i}
+                                  className="w-4 h-4 text-black"
+                                />
+                              );
+                            }
+                            
+                            // Half star
+                            if (hasHalfStar && starPosition === Math.floor(roundedRating)) {
+                              return (
+                                <FaRegStarHalfStroke
+                                  key={i}
+                                  className="w-4 h-4 text-black"
+                                />
+                              );
+                            }
+                            
+                            // Empty star
+                            return (
+                              <FaRegStar
+                                key={i}
+                                className="w-4 h-4 text-black"
+                              />
+                            );
+                          })}
                         </div>
 
                         {/* Comment */}

@@ -11,7 +11,7 @@ class Order extends Model
 
     protected $table = 'orders';
     protected $primaryKey = 'order_id';
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'user_id',
@@ -53,6 +53,6 @@ class Order extends Model
 
     public function canBeCancelled()
     {
-        return $this->status === 'Pending' || $this->status === 'Packaging';
+        return $this->status === 'Packaging';
     }
 }

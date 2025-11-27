@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -31,6 +32,141 @@ class DashboardController extends Controller
                 'total_users' => $totalUsers,
             ],
             'recent_orders' => $recentOrders,
+        ]);
+    }
+
+    public function dashboardData(Request $request)
+    {
+        $timeFrame = $request->input('timeframe', 'month'); // week, month, year
+        
+        // Calculate date range
+        if ($timeFrame === 'week') {
+            $startDate = now()->startOfWeek();
+            $endDate = now()->endOfWeek();
+        } elseif ($timeFrame === 'year') {
+            $startDate = now()->startOfYear();
+            $endDate = now()->endOfYear();
+        } else {
+            $startDate = now()->startOfMonth();
+            $endDate = now()->endOfMonth();
+        }
+
+        // Order stats
+        $orderStats = [
+            'total' => Order::count(),
+            'packaging' => Order::where('status', 'Packaging')->count(),
+            'shipping' => Order::where('status', 'Shipping')->count(),
+            'delivered' => Order::where('status', 'Delivered')->count(),
+            'cancelled' => Order::where('status', 'Cancelled')->count(),
+        ];
+
+        // Total revenue
+        $totalRevenue = Payment::where('status', 'Success')->sum('amount') ?? 0;
+        $previousMonthRevenue = Payment::where('status', 'Success')
+            ->whereBetween('transaction_time', [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()])
+            ->sum('amount') ?? 0;
+        $revenueChange = $previousMonthRevenue > 0 ? (($totalRevenue - $previousMonthRevenue) / $previousMonthRevenue) * 100 : 0;
+
+        // Average order value
+        $averageOrderValue = Order::avg('total_price') ?? 0;
+
+        // Total products
+        $totalProducts = Product::count();
+
+        // Sales data
+        if ($timeFrame === 'week') {
+            $salesData = [];
+            for ($i = 0; $i < 7; $i++) {
+                $date = now()->startOfWeek()->addDays($i);
+                $value = Order::whereHas('payment', function($q) {
+                    $q->where('status', 'Success');
+                })
+                ->whereDate('created_at', $date)
+                ->sum('total_price') ?? 0;
+                
+                $salesData[] = [
+                    'label' => $date->format('D'),
+                    'value' => $value,
+                ];
+            }
+        } elseif ($timeFrame === 'year') {
+            $salesData = [];
+            for ($i = 1; $i <= 12; $i++) {
+                $value = Order::whereHas('payment', function($q) {
+                    $q->where('status', 'Success');
+                })
+                ->whereMonth('created_at', $i)
+                ->whereYear('created_at', now()->year)
+                ->sum('total_price') ?? 0;
+                
+                $salesData[] = [
+                    'label' => Carbon::create(now()->year, $i, 1)->format('M'),
+                    'value' => $value,
+                ];
+            }
+        } else { // month
+            $salesData = [];
+            $weeksInMonth = ceil(now()->daysInMonth / 7);
+            
+            for ($week = 1; $week <= 4; $week++) {
+                $weekStart = now()->startOfMonth()->addWeeks($week - 1);
+                $weekEnd = $weekStart->copy()->addDays(6);
+                
+                $value = Order::whereHas('payment', function($q) {
+                    $q->where('status', 'Success');
+                })
+                ->whereBetween('created_at', [$weekStart, $weekEnd])
+                ->sum('total_price') ?? 0;
+                
+                $salesData[] = [
+                    'label' => 'Week ' . $week,
+                    'value' => $value,
+                ];
+            }
+        }
+
+        // Best sellers
+        $bestSellers = Product::with('images')
+            ->withCount('orderDetails')
+            ->orderBy('order_details_count', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function($product) {
+                return [
+                    'product_id' => $product->product_id,
+                    'name' => $product->name,
+                    'rating' => (float)($product->average_rating ?? 4.5),
+                    'stock' => $product->stock_30ml ?? 0,
+                    'image' => $product->images->first()?->image_url,
+                ];
+            });
+
+        // Recent orders
+        $recentOrders = Order::with('user', 'details.product.images', 'payment')
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function($order) {
+                return [
+                    'order_id' => $order->order_id,
+                    'order_no' => '#ORD-' . str_pad($order->order_id, 4, '0', STR_PAD_LEFT),
+                    'customer_name' => $order->user?->name ?? 'Unknown',
+                    'total' => $order->total_price ?? 0,
+                    'date' => $order->created_at->format('Y-m-d'),
+                    'status' => $order->status ?? 'Pending',
+                    'items_count' => $order->details->count(),
+                ];
+            });
+
+        return response()->json([
+            'orderStats' => $orderStats,
+            'totalRevenue' => $totalRevenue,
+            'averageOrderValue' => $averageOrderValue,
+            'totalProducts' => $totalProducts,
+            'revenueChange' => round($revenueChange, 1),
+            'salesData' => $salesData,
+            'bestSellers' => $bestSellers,
+            'recentOrders' => $recentOrders,
         ]);
     }
 

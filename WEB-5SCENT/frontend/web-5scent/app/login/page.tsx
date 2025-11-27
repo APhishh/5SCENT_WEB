@@ -142,7 +142,26 @@ export default function LoginPage() {
       showToast('Logged in successfully', 'success');
       router.push('/');
     } catch (error: any) {
-      showToast(error.response?.data?.message || 'Invalid email or password', 'error');
+      // Handle specific error cases
+      if (error.response?.status === 422) {
+        // Validation error (invalid credentials)
+        showToast('Invalid email or password', 'error');
+      } else if (error.response?.status === 401) {
+        // Unauthorized
+        showToast('Invalid email or password', 'error');
+      } else if (error.response?.status === 404) {
+        // User not found
+        showToast('Invalid email or password', 'error');
+      } else if (error.response?.data?.message) {
+        // Use backend message if available
+        showToast(error.response.data.message, 'error');
+      } else if (error.message) {
+        // Use error message
+        showToast(error.message, 'error');
+      } else {
+        // Fallback message
+        showToast('Login failed. Please try again.', 'error');
+      }
     } finally {
       setLoading(false);
     }

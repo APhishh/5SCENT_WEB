@@ -12,10 +12,19 @@ const api = axios.create({
 /**
  * Enhanced error logging function
  * Logs detailed information about the error including URL, type, and response status
+ * Skips verbose logging for expected client errors (4xx) that are handled by the application
  */
 function logApiError(endpoint: string, error: any) {
   const timestamp = new Date().toISOString();
   
+  // Skip verbose logging for expected client errors (4xx) - these are handled by application logic
+  if (error.response?.status && error.response.status >= 400 && error.response.status < 500) {
+    // Only log minimal info for client errors (validation, auth, not found, etc.)
+    console.debug(`[${timestamp}] Client Error ${error.response.status} on ${endpoint}`);
+    return;
+  }
+  
+  // Only log verbose errors for server errors (5xx) and network issues
   console.error(`[${timestamp}] API Error on ${endpoint}:`);
   console.error(`Base URL: ${api.defaults.baseURL}`);
   console.error(`Full URL: ${api.defaults.baseURL}${endpoint}`);
@@ -42,7 +51,11 @@ function logApiError(endpoint: string, error: any) {
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    // Try admin token first, then regular user token
+    const adminToken = localStorage.getItem('admin_token');
+    const userToken = localStorage.getItem('token');
+    const token = adminToken || userToken;
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
       // Not using withCredentials since we're using token-based auth, not cookie-based
@@ -68,10 +81,24 @@ api.interceptors.response.use(
     logApiError(endpoint, error);
     
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+      // Handle 401 for both admin and user contexts
+      const adminToken = localStorage.getItem('admin_token');
+      const userToken = localStorage.getItem('token');
+      
+      if (adminToken) {
+        // Admin logout
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/admin/login';
+        }
+      } else if (userToken) {
+        // User logout
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
       }
     }
     

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { HeartIcon, ShoppingCartIcon, StarIcon } from '@heroicons/react/24/solid';
+import { HeartIcon, ShoppingCartIcon } from '@heroicons/react/24/solid';
 import { HeartIcon as HeartOutlineIcon } from '@heroicons/react/24/outline';
+import { FaStar, FaRegStar, FaRegStarHalfStroke } from 'react-icons/fa6';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
@@ -13,6 +14,7 @@ import { motion } from 'framer-motion';
 import SizeSelectionModal from '@/components/SizeSelectionModal';
 import TiltCard from '@/components/TiltCard';
 import { useRouter } from 'next/navigation';
+import { roundRating } from '@/lib/utils';
 
 interface Product {
   product_id: number;
@@ -203,7 +205,7 @@ export default function BestSellerSection() {
               imageUrl = '/products/' + imageUrl.replace(/^\/+/, '');
             }
             
-            const averageRating = Math.round(product.ratings_avg_stars || 0);
+            const averageRating = Number(product.ratings_avg_stars) || 0;
             const ratingCount = product.ratings_count || 0;
 
             return (
@@ -265,18 +267,41 @@ export default function BestSellerSection() {
                       </h3>
                     </Link>
 
-                    {/* Rating - Black stars for actual rating, gray for remaining */}
-                    <div className="flex items-center gap-1 mb-3">
-                      {[...Array(5)].map((_, i) => (
-                        <StarIcon
-                          key={i}
-                          className={`w-5 h-5 ${
-                            i < averageRating
-                              ? 'text-black fill-black'
-                              : 'text-[#BDBDBD] fill-[#BDBDBD]'
-                          }`}
-                        />
-                      ))}
+                    {/* Rating - Black stars for actual rating, black for remaining */}
+                    <div className="flex items-center gap-0.5 mb-3">
+                      {[...Array(5)].map((_, i) => {
+                        const roundedRating = roundRating(averageRating);
+                        const hasHalfStar = Math.abs(roundedRating - Math.floor(roundedRating) - 0.5) < 0.01;
+                        const starPosition = i;
+                        
+                        // Full star
+                        if (starPosition < Math.floor(roundedRating)) {
+                          return (
+                            <FaStar
+                              key={i}
+                              className="w-5 h-5 text-black"
+                            />
+                          );
+                        }
+                        
+                        // Half star
+                        if (hasHalfStar && starPosition === Math.floor(roundedRating)) {
+                          return (
+                            <FaRegStarHalfStroke
+                              key={i}
+                              className="w-5 h-5 text-black"
+                            />
+                          );
+                        }
+                        
+                        // Empty star
+                        return (
+                          <FaRegStar
+                            key={i}
+                            className="w-5 h-5 text-black"
+                          />
+                        );
+                      })}
                       <span className="text-sm text-gray-600 ml-1">
                         ({ratingCount})
                       </span>
