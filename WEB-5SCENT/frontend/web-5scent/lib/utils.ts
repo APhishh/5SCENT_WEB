@@ -13,3 +13,11 @@ export function formatCurrency(value: number): string {
     maximumFractionDigits: 0,
   }).format(value)
 }
+
+/**
+ * Rounds a rating to the nearest 0 or 0.5
+ * Examples: 3.5-3.99 rounds to 3.5, 3.0-3.49 rounds to 3.0
+ */
+export function roundRating(rating: number): number {
+  return Math.round(rating * 2) / 2
+}

@@ -58,26 +58,21 @@ export async function POST(request: NextRequest) {
     const filename = `${userId}_${timestampdate}${extension}`;
     const filepath = join(profilePicsDir, filename);
 
-    // Delete old file if it exists
-    if (oldFilename) {
+    // Delete old file if it exists and is different
+    if (oldFilename && oldFilename !== filename) {
       const oldFilePath = join(profilePicsDir, oldFilename);
-      try {
-        // Check if file exists before attempting deletion
-        if (existsSync(oldFilePath)) {
+      if (existsSync(oldFilePath)) {
+        try {
           await unlink(oldFilePath);
-          console.log(`Successfully deleted old file: ${oldFilename}`);
-        } else {
-          console.warn(`Old file not found for deletion: ${oldFilename}`);
+        } catch (error) {
+          console.error('Error deleting old file:', error);
+          // Continue even if deletion fails
         }
-      } catch (error) {
-        console.error(`Error deleting old file ${oldFilename}:`, error);
-        // Continue even if deletion fails - don't block the upload
       }
     }
 
     // Write file to public/profile_pics
     await writeFile(filepath, buffer);
-    console.log(`Successfully uploaded new file: ${filename}`);
 
     // Return the path relative to public folder
     return NextResponse.json({ 
@@ -91,6 +86,7 @@ export async function POST(request: NextRequest) {
     }, { status: 500 });
   }
 }
+
 
 
 

@@ -1,14 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useRef } from 'react';
-import { HeartIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect } from 'react';
+import { ShoppingCartIcon, HeartIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import ProfilePopup from './ProfilePopup';
-import { ShoppingCartIcon } from './ShoppingCartIcon';
-import GlitchText from './GlitchText';
-import TextType from './TextType';
 import api from '@/lib/api';
 
 export default function Navigation() {
@@ -16,7 +13,6 @@ export default function Navigation() {
   const { items } = useCart();
   const [showProfile, setShowProfile] = useState(false);
   const [wishlistCount, setWishlistCount] = useState(0);
-  const cartIconRef = useRef<any>(null);
 
   const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -31,15 +27,12 @@ export default function Navigation() {
   useEffect(() => {
     const handleWishlistUpdate = () => {
       if (user) {
-        fetchWishlistUpdate();
+        fetchWishlistCount();
       }
     };
 
     const handleCartUpdate = () => {
-      // Trigger cart animation when cart is updated
-      if (cartIconRef.current) {
-        cartIconRef.current.startAnimation();
-      }
+      // Cart count is automatically updated via CartContext
     };
 
     window.addEventListener('wishlist-updated', handleWishlistUpdate);
@@ -62,41 +55,19 @@ export default function Navigation() {
     }
   };
 
-  const fetchWishlistUpdate = async () => {
-    try {
-      const response = await api.get('/wishlist');
-      const wishlistData = response.data.data || response.data;
-      const items = Array.isArray(wishlistData) ? wishlistData : [];
-      setWishlistCount(items.length);
-    } catch (error) {
-      setWishlistCount(0);
-    }
-  };
-
   return (
     <>
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-20">
-            {/* Logo - Typewriter effect with letter spacing - Fixed width to prevent layout shift */}
-            <div className="min-w-[200px]">
-              <Link 
-                href="/" 
-                className="pl-2 inline-block"
-              >
-                <div className="text-3xl font-header font-bold text-gray-900 inline-block" style={{ letterSpacing: '2.8px' }}>
-                  <TextType 
-                    text="5SCENT"
-                    as="span"
-                    typingSpeed={100}
-                    loop={true}
-                    showCursor={false}
-                    pauseDuration={1000}
-                    deletingSpeed={80}
-                  />
-                </div>
-              </Link>
-            </div>
+            {/* Logo - Letter spacing 2.8px, using Poppins font */}
+            <Link 
+              href="/" 
+              className="text-3xl font-header font-bold text-gray-900 pl-2"
+              style={{ letterSpacing: '2.8px' }}
+            >
+              5SCENT
+            </Link>
 
             {/* Navigation Links - Consistent spacing */}
             <div className="flex items-center gap-8">
@@ -138,11 +109,7 @@ export default function Navigation() {
                     className="relative p-2 text-gray-700 hover:text-primary-600 transition-colors"
                     id="cart-icon"
                   >
-                    <ShoppingCartIcon 
-                      ref={cartIconRef}
-                      size={24}
-                      isAnimated={true}
-                    />
+                    <ShoppingCartIcon className="w-6 h-6" />
                     {cartItemCount > 0 && (
                       <span className="absolute top-0 right-0 bg-black text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
                         {cartItemCount}

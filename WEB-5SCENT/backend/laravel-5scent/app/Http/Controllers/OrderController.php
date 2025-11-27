@@ -150,11 +150,11 @@ class OrderController extends Controller
 
         if (!$order->canBeCancelled()) {
             return response()->json([
-                'message' => 'Order can only be cancelled during Pending or Packaging status'
+                'message' => 'Order can only be cancelled during Packaging status'
             ], 400);
         }
 
-        $order->update(['status' => 'Cancelled']);
+        $order->update(['status' => 'Cancel']);
 
         // Restore stock
         foreach ($order->details as $detail) {

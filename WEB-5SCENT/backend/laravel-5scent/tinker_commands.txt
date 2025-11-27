@@ -1,0 +1,29 @@
+use App\Models\Admin;
+use Illuminate\Support\Facades\Hash;
+
+echo "=== Admin Password Fix ===\n";
+echo "Checking and fixing unhashed passwords...\n\n";
+
+$admins = Admin::all();
+$fixed = 0;
+
+foreach ($admins as $admin) {
+    $is_hashed = str_starts_with($admin->password, '$2y$') || str_starts_with($admin->password, '$2a$') || str_starts_with($admin->password, '$2b$');
+    
+    if (!$is_hashed) {
+        echo "Fixing Admin #{$admin->admin_id} ({$admin->email})...\n";
+        $admin->password = Hash::make($admin->password);
+        $admin->save();
+        $fixed++;
+    }
+}
+
+echo "\n✓ Fixed $fixed passwords!\n";
+echo "\nFinal status:\n";
+
+Admin::all()->each(function ($admin) {
+    $status = str_starts_with($admin->password, '$2y$') || str_starts_with($admin->password, '$2a$') || str_starts_with($admin->password, '$2b$') ? '✓ HASHED' : '✗ NOT HASHED';
+    echo "Admin #{$admin->admin_id} ({$admin->email}): $status\n";
+});
+
+echo "\nDone!\n";

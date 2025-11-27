@@ -70,7 +70,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Ratings
     Route::post('/ratings', [RatingController::class, 'store']);
     Route::put('/ratings/{id}', [RatingController::class, 'update']);
-    Route::get('/ratings/reviewed-orders', [RatingController::class, 'getFullyReviewedOrders']);
 
     // Payment
     Route::post('/payments/qris', [PaymentController::class, 'createQrisPayment']);
@@ -78,14 +77,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Admin routes
 Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
-    // Products
-    Route::apiResource('products', ProductController::class);
-
     // Dashboard
+    Route::get('/dashboard/data', [DashboardController::class, 'dashboardData']);
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
     Route::get('/dashboard/orders', [DashboardController::class, 'orders']);
     Route::put('/dashboard/orders/{id}/status', [DashboardController::class, 'updateOrderStatus']);
     Route::get('/dashboard/sales-report', [DashboardController::class, 'salesReport']);
+
+    // Products
+    Route::apiResource('products', ProductController::class);
 
     // POS
     Route::prefix('pos')->group(function () {
