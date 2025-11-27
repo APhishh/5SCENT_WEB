@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import api from '@/lib/api';
 import { Eye, EyeOff, Mail, Lock, ChevronLeft, ChevronRight } from 'lucide-react';
-import TextType from '@/components/TextType';
+import DualTextType from '@/components/DualTextType';
 
 interface ProductImage {
   image_id: number;
@@ -264,30 +264,20 @@ export default function LoginPage() {
       <div className="relative w-1/2 bg-white flex items-center justify-center p-12 max-md:w-full max-md:h-1/2 max-md:p-8">
         <div className="w-full max-w-md">
           {/* Brand and Greeting - Centered */}
+          {/* NOTE: Height is stabilized by DualTextType component which measures full text on mount
+              and sets a fixed height. This prevents layout shift of the form below during animation. */}
           <div className="mb-10 text-center max-md:mb-8">
             <h1 className="text-base uppercase font-bold text-black mb-4 font-header tracking-wider">5SCENT</h1>
-            <h2 className="text-4xl font-bold text-black mb-2 font-header max-md:text-3xl">
-              <TextType 
-                text={["Hi Scent Lover"]}
-                as="span"
-                typingSpeed={80}
-                loop={true}
-                showCursor={false}
-                pauseDuration={500}
-                deletingSpeed={60}
-              />
-            </h2>
-            <p className="text-gray-500 text-base font-body">
-              <TextType 
-                text={["Welcome to 5Scent"]}
-                as="span"
-                typingSpeed={80}
-                loop={true}
-                showCursor={false}
-                pauseDuration={500}
-                deletingSpeed={60}
-              />
-            </p>
+            <DualTextType
+              headerText="Hi Scent Lover"
+              bodyText="Welcome to 5SCENT"
+              headerClassName="text-4xl font-bold text-black mb-2 font-header max-md:text-3xl"
+              bodyClassName="text-base font-body"
+              typingSpeed={80}
+              deletingSpeed={60}
+              pauseBetweenPhases={500}
+              bodyStyle={{ fontFamily: 'SF Pro, -apple-system, BlinkMacSystemFont, sans-serif', color: '#4A5565' }}
+            />
           </div>
 
           {/* Login Form */}
