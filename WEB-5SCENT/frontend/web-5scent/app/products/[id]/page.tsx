@@ -69,6 +69,7 @@ export default function ProductDetailPage() {
   const [selectedSize, setSelectedSize] = useState<'30ml' | '50ml'>('30ml');
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageSlot, setSelectedImageSlot] = useState<number>(2); // 1=50ml, 2=30ml, 3=additional1, 4=additional2
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
 
@@ -91,6 +92,16 @@ export default function ProductDetailPage() {
       const primaryImage = image30ml || image50ml || response.data.images[0];
       if (primaryImage) {
         setSelectedImage(getImageUrl(primaryImage.image_url));
+        // Set initial slot: if 30ml exists, use slot 2; if 50ml, use slot 1; else first available
+        if (image30ml) {
+          setSelectedImageSlot(2);
+        } else if (image50ml) {
+          setSelectedImageSlot(1);
+        } else {
+          // Determine slot based on image index
+          const slotIndex = response.data.images.indexOf(primaryImage);
+          setSelectedImageSlot(slotIndex < 2 ? (slotIndex + 1) : (slotIndex + 1));
+        }
       }
     } catch (error: any) {
       console.error('Error fetching product:', error);
@@ -236,6 +247,21 @@ export default function ProductDetailPage() {
     url: getImageUrl(img.image_url)
   }));
 
+  // Determine label based on slot
+  const getImageLabel = (slot: number): string | null => {
+    // Only show label for slots 1 (50ml) and 2 (30ml)
+    if (slot === 1) {
+      return `${product.name} - 50ml`;
+    }
+    if (slot === 2) {
+      return `${product.name} - 30ml`;
+    }
+    // Hide label for slots 3 and 4 (additional images)
+    return null;
+  };
+
+  const currentImageLabel = getImageLabel(selectedImageSlot);
+
   return (
     <main className="min-h-screen bg-white">
       <Navigation />
@@ -248,11 +274,11 @@ export default function ProductDetailPage() {
               <TiltedCard
                 imageSrc={selectedImage}
                 altText={product.name}
-                labelText={`${product.name} - ${selectedSize}`}
+                labelText={currentImageLabel}
+                imageSlot={selectedImageSlot}
                 containerHeight="500px"
                 containerWidth="100%"
                 rotateAmplitude={15}
-                showShadow={true}
               />
             )}
             
@@ -262,7 +288,34 @@ export default function ProductDetailPage() {
                 {allImages.map((img, index) => (
                   <button
                     key={img.image_id}
-                    onClick={() => setSelectedImage(img.url)}
+                    onClick={() => {
+                      setSelectedImage(img.url);
+                      // Determine slot based on is_50ml flag
+                      // If is_50ml === 1, it's slot 1 (50ml)
+                      // If is_50ml === 0, it's slot 2 (30ml)
+                      // Otherwise, it's slot 3 or 4 based on index
+                      if (img.is_50ml === 1) {
+                        setSelectedImageSlot(1);
+                        setSelectedSize('50ml');
+                      } else if (img.is_50ml === 0) {
+                        setSelectedImageSlot(2);
+                        setSelectedSize('30ml');
+                      } else {
+                        // For additional images (no is_50ml value or other values)
+                        // Count how many images we've seen with is_50ml to determine the actual slot
+                        const imageIndex = allImages.indexOf(img);
+                        const count50ml = allImages.filter(i => i.is_50ml === 1).length;
+                        const count30ml = allImages.filter(i => i.is_50ml === 0).length;
+                        
+                        if (imageIndex === count50ml + count30ml) {
+                          setSelectedImageSlot(3);
+                        } else if (imageIndex === count50ml + count30ml + 1) {
+                          setSelectedImageSlot(4);
+                        } else {
+                          setSelectedImageSlot(3 + (imageIndex - count50ml - count30ml));
+                        }
+                      }
+                    }}
                     className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                       selectedImage === img.url
                         ? 'border-black scale-105'
@@ -376,6 +429,12 @@ export default function ProductDetailPage() {
                   onClick={() => {
                     setSelectedSize('30ml');
                     setQuantity(1);
+                    // Switch to 30ml image (slot 2)
+                    const image30ml = product.images.find((img: any) => img.is_50ml === 0);
+                    if (image30ml) {
+                      setSelectedImage(getImageUrl(image30ml.image_url));
+                      setSelectedImageSlot(2);
+                    }
                   }}
                   className={`px-12 py-6 border-2 rounded-lg font-medium transition-colors font-body flex flex-col items-center ${
                     selectedSize === '30ml'
@@ -390,6 +449,12 @@ export default function ProductDetailPage() {
                   onClick={() => {
                     setSelectedSize('50ml');
                     setQuantity(1);
+                    // Switch to 50ml image (slot 1)
+                    const image50ml = product.images.find((img: any) => img.is_50ml === 1);
+                    if (image50ml) {
+                      setSelectedImage(getImageUrl(image50ml.image_url));
+                      setSelectedImageSlot(1);
+                    }
                   }}
                   className={`px-12 py-6 border-2 rounded-lg font-medium transition-colors font-body flex flex-col items-center ${
                     selectedSize === '50ml'
