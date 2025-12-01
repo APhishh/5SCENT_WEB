@@ -1,54 +1,189 @@
-# Orders Page Implementation Updates
+# Orders Management Page - Admin Updates
 
 ## Summary
-Complete implementation of the Orders page with tracking information, order state-specific actions, and UI improvements as per the design mockups.
+Updated admin orders management page to fix payment method display and add POS transactions visualization.
 
 ## Changes Made
 
-### 1. Frontend: `/app/orders/page.tsx`
+### 1. Fixed Payment Method Display (Issue #1)
 
-#### Imports Added
-- `MdOutlineContentCopy` - Copy icon for tracking numbers
-- `LiaBoxSolid` - Package/shipping box icon for tracking display
+**Problem:** All orders showed "QRIS" regardless of actual payment method.
 
-#### State Management
-Added new state for confirmation modals:
-```typescript
-interface ConfirmationModalState {
-  isOpen: boolean;
-  type: 'received' | 'cancel' | null;
-  order: OrderData | null;
-}
+**Solution:** Updated payment method field to display actual `order.payment_method` value with proper formatting.
 
-const [confirmationModal, setConfirmationModal] = useState<ConfirmationModalState>({
-  isOpen: false,
-  type: null,
-  order: null,
-});
+**Code:**
+```tsx
+// Before (Hardcoded)
+<div className="px-3 py-1 bg-gray-100 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 inline-block">
+  QRIS
+</div>
+
+// After (Dynamic)
+<div className="px-3 py-1 bg-gray-100 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 inline-block">
+  {order.payment_method ? order.payment_method.replace('_', ' ') : 'N/A'}
+</div>
 ```
 
-#### New Handler Functions
+**Benefits:**
+- Shows actual payment method (QRIS, Virtual_Account, Cash)
+- Underscores replaced with spaces for better display (Virtual_Account → Virtual Account)
+- Fallback to 'N/A' if no payment method set
 
-**`handleOpenConfirmation(type, order)`**
-- Opens confirmation modal for either "received" or "cancel" actions
-- Stores order data for confirmation handling
+---
 
-**`handleCloseConfirmation()`**
-- Closes confirmation modal and resets state
+### 2. Added POS Transactions Display (Issue #2)
 
-**`handleConfirmReceived()`**
-- Calls `POST /orders/{id}/finish` to update order status to "Delivered"
-- Updates local state optimistically
-- Shows success toast and closes modal
+**Problem:** POS transactions not visible in orders management page.
 
-**`handleConfirmCancel()`**
-- Calls `POST /orders/{id}/cancel` to update order status to "Cancel"
-- Restocks items via backend
-- Updates local state optimistically
-- Shows success toast and closes modal
+**Solution:** Fetched and displayed POS transactions as separate cards with distinct visual styling.
 
-**`copyTrackingNumber(trackingNumber)`**
-- Copies tracking number to clipboard
+#### TypeScript Interfaces Added
+
+```typescript
+interface PosItem {
+  pos_item_id: number;
+  product_id: number;
+  size: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+  product?: { name: string; product_id: number };
+}
+
+interface PosTransaction {
+  transaction_id: number;
+  admin_id: number;
+  customer_name: string;
+  phone: string;
+  date: string;
+  total_price: number;
+  payment_method: string;
+  cash_received?: number | null;
+  cash_change?: number | null;
+  order_id?: number | null;
+  items?: PosItem[];
+  admin?: { admin_id: number; name: string };
+}
+
+interface PosTransactionResponse {
+  data: PosTransaction[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}
+```
+
+#### State Variables Added
+
+```typescript
+const [posTransactions, setPosTransactions] = useState<PosTransaction[]>([]);
+const [posPage, setPosPage] = useState(1);
+const [posTotalPages, setPosTotalPages] = useState(1);
+const [posTotal, setPosTotal] = useState(0);
+```
+
+#### API Integration
+
+```typescript
+const fetchPosTransactions = async () => {
+  try {
+    const response = await api.get<PosTransactionResponse>(
+      `/admin/pos/transactions?page=${posPage}`
+    );
+    const data = response.data;
+    
+    setPosTransactions(data.data || []);
+    setPosPage(data.current_page || 1);
+    setPosTotalPages(data.last_page || 1);
+    setPosTotal(data.total || 0);
+  } catch (error) {
+    console.error('Error fetching POS transactions:', error);
+  }
+};
+```
+
+#### POS Transaction Card Design
+
+Each POS transaction displays as:
+
+**Visual Style:**
+- Green left border (4px) to distinguish from orders
+- Green payment method badge
+- Hover shadow effect
+- Two-row layout similar to order cards
+
+**Row 1 - Header:**
+```
+[POS Order ID: #123] | [Customer: David] | [Payment: QRIS] | [Status: Completed]
+```
+
+**Row 2 - Details:**
+```
+[Phone: +62 873 824 674] | [Items: 2 product(s)] | [Total: Rp277,000] | [Date: 2024-11-12]
+```
+
+#### Pagination for POS
+
+```tsx
+<button onClick={() => setPosPage(prev => Math.max(1, prev - 1))}>
+  Previous POS
+</button>
+<button onClick={() => setPosPage(prev => Math.min(posTotalPages, prev + 1))}>
+  Next POS
+</button>
+```
+
+Separate from order pagination, allowing independent navigation.
+
+---
+
+### 3. Backend Updates
+
+**File:** `app/Http/Controllers/DashboardController.php`
+
+Updated orders query to explicitly select all columns:
+```php
+$query = Order::with('user', 'details.product.images')->select('*');
+```
+
+This ensures payment_method field is included in the response.
+
+---
+
+## Display Examples
+
+### Regular Order Card (Standard):
+```
+Order ID: #ORD-01-12-2025-001
+Customer: John Doe
+Payment: Virtual Account
+Status: Pending
+```
+
+### POS Transaction Card (Green):
+```
+POS Order ID: #123
+Customer: David  
+Payment: QRIS
+Status: Completed
+Phone: +62 873 824 674
+Items: 2 product(s)
+Total: Rp277,000
+Date: 2024-11-12
+```
+
+---
+
+## Payment Method Format
+
+The system now properly handles payment method ENUM values:
+- `QRIS` → "QRIS"
+- `Virtual_Account` → "Virtual Account" 
+- `Cash` → "Cash"
+
+---
+
+## Files Modified
 - Shows success toast notification
 
 **`getActionButton(order)`**

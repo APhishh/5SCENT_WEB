@@ -37,6 +37,21 @@ class ProductController extends Controller
                 })->values();
             }
 
+            // Add image thumbnails for POS Tool compatibility
+            $products = $products->map(function ($product) {
+                $image30ml = ProductImage::where('product_id', $product->product_id)
+                    ->where('is_50ml', false)
+                    ->first();
+                $image50ml = ProductImage::where('product_id', $product->product_id)
+                    ->where('is_50ml', true)
+                    ->first();
+
+                // Extract just the filename to ensure correct path construction
+                $product->image_thumb = $image30ml ? basename($image30ml->image_url) : null;
+                $product->image_thumb_50ml = $image50ml ? basename($image50ml->image_url) : null;
+                return $product;
+            });
+
             return response()->json([
                 'products' => $products,
                 'total' => $products->count(),

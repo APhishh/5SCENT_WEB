@@ -179,7 +179,7 @@ class DashboardController extends Controller
 
     public function orders(Request $request)
     {
-        $query = Order::with('user', 'details.product.images');
+        $query = Order::with('user', 'details.product.images')->select('*');
 
         if ($request->has('status')) {
             $query->where('status', $request->status);

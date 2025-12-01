@@ -328,9 +328,13 @@ export default function EditProductPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                     />
                   </div>
+                  <div></div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Stock Quantity
+                      Stock 30ml
                     </label>
                     <input
                       type="number"
@@ -341,6 +345,20 @@ export default function EditProductPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Stock 50ml
+                    </label>
+                    <input
+                      type="number"
+                      name="stock_50ml"
+                      value={formData.stock_50ml}
+                      onChange={handleInputChange}
+                      placeholder="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <div></div>
                 </div>
               </div>
             </div>

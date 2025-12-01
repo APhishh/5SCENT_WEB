@@ -306,7 +306,7 @@ export default function ProductsPage() {
         console.log('Sending PUT request to:', `/admin/products/${editingProduct.product_id}`);
         const response = await api.put(`/admin/products/${editingProduct.product_id}`, submitData, {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            'Content-Type': undefined,
           },
         });
         console.log('Response:', response.data);
@@ -324,7 +324,7 @@ export default function ProductsPage() {
         });
         const response = await api.post('/admin/products', submitData, {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            'Content-Type': undefined,
           },
         });
         console.log('Response:', response.data);
@@ -382,23 +382,6 @@ export default function ProductsPage() {
   return (
     <AdminLayout>
       <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-8 py-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Product Management</h1>
-              <p className="text-gray-600">Manage your perfume inventory</p>
-            </div>
-            <p className="text-sm text-gray-600">
-              📅 {new Date().toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-              })}
-            </p>
-          </div>
-        </div>
-
         {/* Control Bar */}
         <div className="bg-white border-b border-gray-200 px-8 py-4">
           <div className="flex items-center gap-4">
@@ -714,9 +697,13 @@ export default function ProductsPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                       />
                     </div>
+                    <div></div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Stock Quantity
+                        Stock 30ml
                       </label>
                       <input
                         type="number"
@@ -728,6 +715,21 @@ export default function ProductsPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Stock 50ml
+                      </label>
+                      <input
+                        type="number"
+                        name="stock_50ml"
+                        value={formData.stock_50ml}
+                        onChange={handleInputChange}
+                        placeholder="0"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <div></div>
                   </div>
                 </div>
               </div>
