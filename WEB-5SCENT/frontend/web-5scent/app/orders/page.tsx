@@ -4,9 +4,10 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { SiHackthebox } from 'react-icons/si';
 import { GoPerson } from 'react-icons/go';
-import { FiPhone } from 'react-icons/fi';
+import { FiPhone, FiPackage } from 'react-icons/fi';
 import { IoLocationOutline } from 'react-icons/io5';
 import { FaStar, FaRegStar, FaRegStarHalfStroke } from 'react-icons/fa6';
+import { LuCopy } from 'react-icons/lu';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/contexts/AuthContext';
@@ -572,6 +573,29 @@ function OrderHistoryContent() {
                   </div>
                 </div>
 
+                {/* Tracking Number - Show if available */}
+                {order.tracking_number && (
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FiPackage className="text-gray-600" size={18} />
+                      <div>
+                        <p className="text-xs text-gray-600">Tracking</p>
+                        <p className="text-sm font-medium text-gray-900">{order.tracking_number}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(order.tracking_number);
+                        showToast('Tracking number copied!', 'success');
+                      }}
+                      className="p-2 hover:bg-gray-200 rounded-lg transition"
+                      title="Copy tracking number"
+                    >
+                      <LuCopy size={18} className="text-gray-600" />
+                    </button>
+                  </div>
+                )}
+
                 {/* Products List */}
                 <div className="mb-6">
                   {order.details.map((item) => (
@@ -590,7 +614,10 @@ function OrderHistoryContent() {
                           <p className="font-medium text-gray-900 text-sm">{item.product.name}</p>
                           <p className="text-xs text-gray-600">{item.size} × {item.quantity}</p>
                         </div>
-                        <p className="font-semibold text-gray-900 text-sm ml-4 flex-shrink-0">{formatCurrency(item.subtotal)}</p>
+                        <div className="text-right ml-4 flex-shrink-0">
+                          <p className="text-xs text-gray-600">Unit Price</p>
+                          <p className="font-semibold text-gray-900 text-sm">{formatCurrency(item.price)}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -719,6 +746,30 @@ function OrderHistoryContent() {
                     </div>
                   </div>
 
+                  {/* Tracking Information */}
+                  {modal.order.tracking_number && (
+                    <div className="bg-purple-50 rounded-2xl p-6">
+                      <h3 className="text-base font-semibold text-gray-900 mb-4">Tracking Information</h3>
+                      <div className="flex items-center gap-3">
+                        <FiPackage className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-600 mb-1">Tracking Number</p>
+                          <p className="text-sm font-semibold text-gray-900">{modal.order.tracking_number}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(modal.order!.tracking_number!);
+                            showToast('Tracking number copied!', 'success');
+                          }}
+                          className="p-2 hover:bg-purple-100 rounded-lg transition flex-shrink-0"
+                          title="Copy tracking number"
+                        >
+                          <LuCopy size={18} className="text-purple-600" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Order Items */}
                   <div className="bg-gray-100 rounded-2xl p-6">
                     <h3 className="text-base font-semibold text-gray-900 mb-4">Order Items</h3>
@@ -826,11 +877,11 @@ function OrderHistoryContent() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Subtotal</span>
-                        <span className="font-medium text-gray-900">{formatCurrency(modal.order!.total_price / 1.05)}</span>
+                        <span className="font-medium text-gray-900">{formatCurrency(modal.order!.details.reduce((sum, item) => sum + item.subtotal, 0))}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Tax (5%)</span>
-                        <span className="font-medium text-gray-900">{formatCurrency(modal.order!.total_price - (modal.order!.total_price / 1.05))}</span>
+                        <span className="font-medium text-gray-900">{formatCurrency(modal.order!.details.reduce((sum, item) => sum + item.subtotal, 0) * 0.05)}</span>
                       </div>
                       <div className="border-t border-gray-300 pt-3 mt-3 flex justify-between">
                         <span className="font-semibold text-gray-900">Total Amount</span>

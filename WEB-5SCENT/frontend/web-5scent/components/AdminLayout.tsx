@@ -57,14 +57,17 @@ export default function AdminLayout({ children, onRefresh, refreshing }: AdminLa
   const isProducts = pathname?.startsWith('/admin/products');
   const isOrders = pathname?.startsWith('/admin/orders');
   const isPOS = pathname?.startsWith('/admin/pos');
+  const isReviews = pathname?.startsWith('/admin/reviews');
 
-  const headerTitle = isProducts ? 'Product Management' : isOrders ? 'Order Management' : isPOS ? 'POS Tool' : 'Dashboard Overview';
+  const headerTitle = isProducts ? 'Product Management' : isOrders ? 'Order Management' : isPOS ? 'POS Tool' : isReviews ? 'Reviews Management' : 'Dashboard Overview';
   const headerSubtitle = isProducts
     ? 'Manage your perfume inventory'
     : isOrders
     ? 'View and manage customer orders'
     : isPOS
     ? 'Process offline sales and generate receipts'
+    : isReviews
+    ? 'Monitor customer feedback'
     : 'Monitor your store performance at a glance';
 
   if (!admin) {

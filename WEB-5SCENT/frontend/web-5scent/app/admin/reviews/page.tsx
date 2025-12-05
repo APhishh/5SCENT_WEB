@@ -6,12 +6,9 @@ import api from '@/lib/api';
 import { useToast } from '@/contexts/ToastContext';
 import {
   XMarkIcon,
-  TrashIcon,
-  EyeIcon,
-  EyeSlashIcon,
 } from '@heroicons/react/24/outline';
-import { FaStar } from 'react-icons/fa6';
-import { FiCalendar } from 'react-icons/fi';
+import { FaStar, FaRegStar, FaRegStarHalfStroke } from 'react-icons/fa6';
+import { FiEye, FiEyeOff, FiTrash2 } from 'react-icons/fi';
 
 interface Review {
   rating_id: number;
@@ -116,42 +113,40 @@ export default function ReviewsPage() {
   };
 
   const renderStars = (rating: number) => {
-    return (
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+      if (i <= rating) {
+        stars.push(
           <FaStar
-            key={star}
+            key={i}
             size={16}
-            className={star <= rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}
+            className="text-black fill-black"
           />
-        ))}
-      </div>
-    );
+        );
+      } else if (i - rating === 0.5) {
+        stars.push(
+          <FaRegStarHalfStroke
+            key={i}
+            size={16}
+            className="text-black fill-black"
+          />
+        );
+      } else {
+        stars.push(
+          <FaRegStar
+            key={i}
+            size={16}
+            className="text-black"
+          />
+        );
+      }
+    }
+    return <div className="flex items-center gap-1">{stars}</div>;
   };
 
   return (
     <AdminLayout>
       <div className="flex flex-col gap-6 p-6">
-        {/* Header */}
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reviews Management</h1>
-            <p className="text-gray-500 text-sm mt-1">Monitor customer feedback</p>
-          </div>
-          
-          {/* Date Selector */}
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition">
-            <FiCalendar className="text-gray-600" size={18} />
-            <span className="text-gray-700 font-medium">
-              {new Date(selectedDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </span>
-          </button>
-        </div>
-
         {/* Reviews Table Card */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           {loading ? (
@@ -208,7 +203,7 @@ export default function ReviewsPage() {
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleViewDetails(review)}
-                            className="px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded transition"
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-lg border border-gray-200 hover:bg-gray-50 transition"
                           >
                             View
                           </button>
@@ -219,23 +214,23 @@ export default function ReviewsPage() {
                                 review.is_visible ?? true
                               )
                             }
-                            className="p-2 text-gray-600 hover:bg-gray-100 rounded transition"
+                            className="p-2 text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                             title={
                               review.is_visible ?? true ? 'Hide review' : 'Show review'
                             }
                           >
                             {review.is_visible ?? true ? (
-                              <EyeIcon size={18} />
+                              <FiEye size={18} />
                             ) : (
-                              <EyeSlashIcon size={18} />
+                              <FiEyeOff size={18} />
                             )}
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(review.rating_id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded transition"
+                            className="p-2 text-red-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition"
                             title="Delete review"
                           >
-                            <TrashIcon size={18} />
+                            <FiTrash2 size={18} />
                           </button>
                         </div>
                       </td>
@@ -250,62 +245,62 @@ export default function ReviewsPage() {
 
       {/* Review Details Modal */}
       {showDetailsModal && selectedReview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
-            {/* Close Button */}
-            <div className="flex justify-end mb-4">
+        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50}}>
+          <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', padding: '1.5rem', maxWidth: '28rem', width: '100%', marginLeft: '1rem', marginRight: '1rem'}}>
+            {/* Modal Header with Close Button */}
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem'}}>
+              <div>
+                <h2 style={{fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', margin: 0}}>Review Details</h2>
+                <p style={{fontSize: '0.875rem', color: '#9CA3AF', margin: '0.25rem 0 0 0'}}>Full review information</p>
+              </div>
               <button
                 onClick={() => setShowDetailsModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                style={{color: '#9CA3AF', cursor: 'pointer', fontSize: '1.5rem', border: 'none', background: 'none', padding: 0, lineHeight: 1, marginLeft: '1rem'}}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#374151')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#9CA3AF')}
               >
-                <XMarkIcon size={24} />
+                ✕
               </button>
             </div>
 
-            {/* Modal Header */}
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Review Details</h2>
-              <p className="text-sm text-gray-500 mt-1">Full review information</p>
-            </div>
-
             {/* Customer and Date Row */}
-            <div className="grid grid-cols-2 gap-6 mb-6">
+            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem'}}>
               <div>
-                <label className="block text-xs text-gray-500 font-semibold mb-1">
+                <label style={{display: 'block', fontSize: '0.75rem', color: '#9CA3AF', fontWeight: '600', marginBottom: '0.25rem'}}>
                   Customer
                 </label>
-                <p className="text-sm font-bold text-gray-900">
+                <p style={{fontSize: '0.875rem', fontWeight: 'bold', color: '#111827'}}>
                   {selectedReview.user?.name || 'Unknown'}
                 </p>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 font-semibold mb-1">
+                <label style={{display: 'block', fontSize: '0.75rem', color: '#9CA3AF', fontWeight: '600', marginBottom: '0.25rem'}}>
                   Date
                 </label>
-                <p className="text-sm font-bold text-gray-900">
+                <p style={{fontSize: '0.875rem', fontWeight: 'bold', color: '#111827'}}>
                   {formatDate(selectedReview.created_at)}
                 </p>
               </div>
             </div>
 
             {/* Product */}
-            <div className="mb-6">
-              <label className="block text-xs text-gray-500 font-semibold mb-2">
+            <div style={{marginBottom: '1.5rem'}}>
+              <label style={{display: 'block', fontSize: '0.75rem', color: '#9CA3AF', fontWeight: '600', marginBottom: '0.5rem'}}>
                 Product
               </label>
-              <p className="text-sm font-bold text-gray-900">
+              <p style={{fontSize: '0.875rem', fontWeight: 'bold', color: '#111827'}}>
                 {selectedReview.product?.name || 'Unknown'}
               </p>
             </div>
 
             {/* Rating */}
-            <div className="mb-6">
-              <label className="block text-xs text-gray-500 font-semibold mb-2">
+            <div style={{marginBottom: '1.5rem'}}>
+              <label style={{display: 'block', fontSize: '0.75rem', color: '#9CA3AF', fontWeight: '600', marginBottom: '0.5rem'}}>
                 Rating
               </label>
-              <div className="flex items-center gap-2">
+              <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
                 {renderStars(selectedReview.stars)}
-                <span className="text-sm font-semibold text-gray-900">
+                <span style={{fontSize: '0.875rem', fontWeight: '600', color: '#111827'}}>
                   {selectedReview.stars}/5
                 </span>
               </div>
@@ -313,10 +308,10 @@ export default function ReviewsPage() {
 
             {/* Comment */}
             <div>
-              <label className="block text-xs text-gray-500 font-semibold mb-2">
+              <label style={{display: 'block', fontSize: '0.75rem', color: '#9CA3AF', fontWeight: '600', marginBottom: '0.5rem'}}>
                 Comment
               </label>
-              <div className="bg-gray-100 rounded-lg p-4 text-sm text-gray-800 leading-relaxed">
+              <div style={{backgroundColor: '#F3F4F6', borderRadius: '0.5rem', padding: '1rem', fontSize: '0.875rem', color: '#1F2937', lineHeight: '1.5'}}>
                 {selectedReview.comment}
               </div>
             </div>
@@ -326,22 +321,26 @@ export default function ReviewsPage() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm !== null && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Review</h3>
-            <p className="text-gray-600 mb-6">
+        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50}}>
+          <div style={{backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', padding: '1.5rem', maxWidth: '32rem', width: '100%', marginLeft: '1rem', marginRight: '1rem'}}>
+            <h3 style={{fontSize: '1.125rem', fontWeight: 'bold', color: '#111827', marginBottom: '0.5rem'}}>Delete Review</h3>
+            <p style={{color: '#4B5563', marginBottom: '1.5rem'}}>
               Are you sure you want to delete this review? This action cannot be undone.
             </p>
-            <div className="flex gap-4 justify-end">
+            <div style={{display: 'flex', gap: '1rem', justifyContent: 'flex-end'}}>
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                style={{padding: '0.5rem 1rem', color: '#374151', border: '1px solid #D1D5DB', borderRadius: '0.5rem', cursor: 'pointer', backgroundColor: 'white', fontSize: '0.875rem'}}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F3F4F6')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'white')}
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDeleteReview(deleteConfirm)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                style={{padding: '0.5rem 1rem', backgroundColor: '#DC2626', color: 'white', borderRadius: '0.5rem', cursor: 'pointer', border: 'none', fontSize: '0.875rem'}}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#B91C1C')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#DC2626')}
               >
                 Delete
               </button>
