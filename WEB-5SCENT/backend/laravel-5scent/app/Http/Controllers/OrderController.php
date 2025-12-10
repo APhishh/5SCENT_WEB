@@ -65,7 +65,11 @@ class OrderController extends Controller
         $validated = $request->validate([
             'cart_ids' => 'required|array',
             'cart_ids.*' => 'exists:cart,cart_id',
-            'shipping_address' => 'required|string|max:255',
+            'address_line' => 'required|string|max:255',
+            'district' => 'required|string|max:255',
+            'city' => 'required|string|max:255',
+            'province' => 'required|string|max:255',
+            'postal_code' => 'required|string|max:20',
             'payment_method' => 'required|in:QRIS,Virtual_Account,Cash',
         ]);
 
@@ -97,7 +101,11 @@ class OrderController extends Controller
         $order = Order::create([
             'user_id' => $request->user()->user_id,
             'status' => $orderStatus,
-            'shipping_address' => $validated['shipping_address'],
+            'address_line' => $validated['address_line'],
+            'district' => $validated['district'],
+            'city' => $validated['city'],
+            'province' => $validated['province'],
+            'postal_code' => $validated['postal_code'],
             'subtotal' => $subtotal,
             'total_price' => $totalPrice,
             'payment_method' => $validated['payment_method'],

@@ -154,7 +154,11 @@ function CheckoutContent() {
     try {
       const response = await api.post('/orders', {
         cart_ids: selectedItemIds,
-        shipping_address: `${formData.addressLine}, ${formData.district}, ${formData.city}, ${formData.province} ${formData.postalCode}`,
+        address_line: formData.addressLine,
+        district: formData.district,
+        city: formData.city,
+        province: formData.province,
+        postal_code: formData.postalCode,
         payment_method: paymentMethod,
       });
 

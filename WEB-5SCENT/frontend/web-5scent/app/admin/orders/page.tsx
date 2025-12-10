@@ -43,7 +43,11 @@ interface Order {
   tracking_number: string | null;
   subtotal: number;
   total_price: number;
-  shipping_address: string;
+  address_line: string | null;
+  district: string | null;
+  city: string | null;
+  province: string | null;
+  postal_code: string | null;
   created_at: string;
   payment_method?: string;
   payment?: Payment;
@@ -51,11 +55,6 @@ interface Order {
     name: string;
     email: string;
     phone?: string;
-    address_line?: string;
-    district?: string;
-    city?: string;
-    province?: string;
-    postal_code?: string;
   };
   details?: OrderItem[];
 }
@@ -472,7 +471,11 @@ export default function OrdersPage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="text-xs text-gray-500 font-medium mb-1">Customer Address</div>
-                          <div className="text-sm text-gray-700">{order.shipping_address || 'N/A'}</div>
+                          <div className="text-sm text-gray-700">
+                            {order.address_line && order.city
+                              ? `${order.address_line}, ${order.district}, ${order.city}, ${order.province} ${order.postal_code}`
+                              : 'N/A'}
+                          </div>
                         </div>
 
                         <div className="flex-1 flex justify-end gap-12">
@@ -681,24 +684,24 @@ export default function OrdersPage() {
                         <div className="text-sm font-medium text-gray-900">{selectedOrder.user?.phone || 'N/A'}</div>
                       </div>
                       <div className="col-span-2">
-                        <div className="text-xs font-medium text-gray-600 mb-1">Address</div>
-                        <div className="text-sm font-medium text-gray-900">{selectedOrder.user?.address_line || 'N/A'}</div>
+                        <div className="text-xs font-medium text-gray-600 mb-1">Shipping Address</div>
+                        <div className="text-sm font-medium text-gray-900">{selectedOrder.address_line || 'N/A'}</div>
                       </div>
                       <div>
                         <div className="text-xs font-medium text-gray-600 mb-1">District</div>
-                        <div className="text-sm font-medium text-gray-900">{selectedOrder.user?.district || 'N/A'}</div>
+                        <div className="text-sm font-medium text-gray-900">{selectedOrder.district || 'N/A'}</div>
                       </div>
                       <div>
                         <div className="text-xs font-medium text-gray-600 mb-1">City</div>
-                        <div className="text-sm font-medium text-gray-900">{selectedOrder.user?.city || 'N/A'}</div>
+                        <div className="text-sm font-medium text-gray-900">{selectedOrder.city || 'N/A'}</div>
                       </div>
                       <div>
                         <div className="text-xs font-medium text-gray-600 mb-1">Province</div>
-                        <div className="text-sm font-medium text-gray-900">{selectedOrder.user?.province || 'N/A'}</div>
+                        <div className="text-sm font-medium text-gray-900">{selectedOrder.province || 'N/A'}</div>
                       </div>
                       <div>
                         <div className="text-xs font-medium text-gray-600 mb-1">Postal Code</div>
-                        <div className="text-sm font-medium text-gray-900">{selectedOrder.user?.postal_code || 'N/A'}</div>
+                        <div className="text-sm font-medium text-gray-900">{selectedOrder.postal_code || 'N/A'}</div>
                       </div>
                     </div>
                   </div>
