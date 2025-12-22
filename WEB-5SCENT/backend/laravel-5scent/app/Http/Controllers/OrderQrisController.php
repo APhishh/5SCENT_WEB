@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Services\NotificationService;
+use App\Helpers\OrderCodeHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +65,37 @@ class OrderQrisController extends Controller
                 ], 404);
             }
 
+            // Calculate effective status based on expiry time
+            $effectiveStatus = $qrisTransaction->status;
+            if ($qrisTransaction->status === 'pending' && $qrisTransaction->expired_at && $qrisTransaction->expired_at <= now()) {
+                // Actually expire the transaction immediately when detected
+                $qrisTransaction->update([
+                    'status' => 'expire',
+                    'updated_at' => $qrisTransaction->expired_at,
+                ]);
+                
+                // Also cancel the order if it's still pending
+                if ($order->status === 'Pending') {
+                    $order->update(['status' => 'Cancelled']);
+                    
+                    // Create expiry notification
+                    $orderCode = \App\Helpers\OrderCodeHelper::formatOrderCode($order);
+                    NotificationService::createOrderUpdateNotification(
+                        $order->order_id,
+                        "Payment for order {$orderCode} has expired."
+                    );
+                }
+                
+                $effectiveStatus = 'expire';
+                
+                \Log::info('QRIS transaction expired immediately on status check', [
+                    'qris_transaction_id' => $qrisTransaction->qris_transaction_id,
+                    'order_id' => $order->order_id,
+                    'expired_at' => $qrisTransaction->expired_at->toISOString(),
+                    'detected_at' => now()->toISOString(),
+                ]);
+            }
+
             return response()->json([
                 'success' => true,
                 'order' => [
@@ -80,6 +113,7 @@ class OrderQrisController extends Controller
                 'qris' => [
                     'qr_url' => $qrisTransaction->qr_url,
                     'status' => $qrisTransaction->status,
+                    'effective_status' => $effectiveStatus,
                     'expired_at' => $qrisTransaction->expired_at?->toIso8601String(),
                 ],
             ], 200);
@@ -116,6 +150,7 @@ class OrderQrisController extends Controller
      *   "success": true,
      *   "payment_status": "Success|Pending|Failed|Refunded",
      *   "qris_status": "settlement|pending|expire|cancel|deny",
+     *   "effective_status": "settlement|pending|expire|cancel|deny",
      *   "order_status": "Pending|Packaging|Shipping|Delivered|Cancel"
      * }
      */
@@ -126,10 +161,52 @@ class OrderQrisController extends Controller
             $payment = $order->payment()->first();
             $qrisTransaction = $order->paymentTransaction()->first();
 
+            // Calculate effective status based on expiry time
+            $effectiveStatus = $qrisTransaction->status ?? 'pending';
+            if ($qrisTransaction && $qrisTransaction->status === 'pending' && $qrisTransaction->expired_at && $qrisTransaction->expired_at <= now()) {
+                // Actually expire the transaction immediately when detected
+                $qrisTransaction->update([
+                    'status' => 'expire',
+                    'updated_at' => $qrisTransaction->expired_at,
+                ]);
+                
+                // Also cancel the order if it's still pending
+                if ($order->status === 'Pending') {
+                    $order->update(['status' => 'Cancelled']);
+                    
+                    // Create expiry notifications
+                    $orderCode = OrderCodeHelper::formatOrderCode($order);
+                    
+                    // Create order update notification
+                    NotificationService::createOrderUpdateNotification(
+                        $order->order_id,
+                        "Payment for order {$orderCode} has expired."
+                    );
+                    
+                    // Create payment notification
+                    NotificationService::createPaymentNotification(
+                        $order->user_id ?? $order->order_id,
+                        $order->order_id,
+                        "Payment for order {$orderCode} has expired.",
+                        'Payment'
+                    );
+                }
+                
+                $effectiveStatus = 'expire';
+                
+                \Log::info('QRIS transaction expired immediately on payment status check', [
+                    'qris_transaction_id' => $qrisTransaction->qris_transaction_id,
+                    'order_id' => $order->order_id,
+                    'expired_at' => $qrisTransaction->expired_at->toISOString(),
+                    'detected_at' => now()->toISOString(),
+                ]);
+            }
+
             return response()->json([
                 'success' => true,
                 'payment_status' => $payment->status ?? 'Pending',
                 'qris_status' => $qrisTransaction->status ?? 'pending',
+                'effective_status' => $effectiveStatus,
                 'order_status' => $order->status ?? 'Pending',
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -254,6 +331,12 @@ class OrderQrisController extends Controller
                 'status' => 'Cancelled',
             ]);
 
+            // Update payment status to Expired
+            $payment = \App\Models\Payment::where('order_id', $orderId)->first();
+            if ($payment) {
+                $payment->update(['status' => 'Expired']);
+            }
+
             // Update QRIS transaction status to expired using raw query
             \DB::table('qris_transactions')
                 ->where('order_id', $orderId)
@@ -265,6 +348,7 @@ class OrderQrisController extends Controller
             // Create expiry notification
             $orderCode = \App\Helpers\OrderCodeHelper::formatOrderCode($order);
             \App\Services\NotificationService::createPaymentNotification(
+                $order->user_id,
                 $order->order_id,
                 "Your payment for order {$orderCode} has expired. Please create a new payment."
             );

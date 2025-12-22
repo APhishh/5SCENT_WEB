@@ -6,6 +6,8 @@ use App\Models\Notification;
 use App\Models\Order;
 use App\Models\User;
 use App\Helpers\OrderCodeHelper;
+use App\Events\NotificationCreated;
+use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
@@ -46,40 +48,60 @@ class NotificationService
         }
 
         $orderCode = OrderCodeHelper::formatOrderCode($order);
-
-        return Notification::create([
+        $notification = Notification::create([
             'user_id' => $order->user_id,
             'order_id' => $orderId,
             'message' => $message ?? "Your order {$orderCode} has been delivered. We'd love to hear your thoughts.",
             'notif_type' => 'Delivery',
             'is_read' => false,
         ]);
+
+        // Broadcast the notification
+        static::broadcastNotification($notification);
+
+        return $notification;
     }
 
     /**
-     * Create a Payment notification
-     * Allows multiple notifications - each payment event creates a new notification
+     * Create a Payment notification with de-duplication
+     * Prevents duplicate notifications for the same message/order within 5 minutes
      */
-    public static function createPaymentNotification($orderId, $message = null)
+    public static function createPaymentNotification($userId, $orderId, $message, $notifType = 'Payment')
     {
-        $order = Order::find($orderId);
+        $message = $message ?? 'Your payment has been processed.';
 
-        if (!$order) {
-            return null;
+        // Check for duplicate notifications within 5 minutes
+        $existingNotification = Notification::where('order_id', $orderId)
+            ->where('notif_type', $notifType)
+            ->where('message', $message)
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->first();
+
+        if ($existingNotification) {
+            Log::debug('Duplicate payment notification prevented', [
+                'order_id' => $orderId,
+                'message' => $message,
+            ]);
+            return $existingNotification;
         }
 
-        return Notification::create([
-            'user_id' => $order->user_id,
+        $notification = Notification::create([
+            'user_id' => $userId,
             'order_id' => $orderId,
-            'message' => $message ?? 'Your payment has been processed.',
-            'notif_type' => 'Payment',
+            'message' => $message,
+            'notif_type' => $notifType,
             'is_read' => false,
         ]);
+
+        // Broadcast the notification
+        static::broadcastNotification($notification);
+
+        return $notification;
     }
 
     /**
-     * Create an OrderUpdate notification
-     * Allows multiple notifications - each status change creates a new notification
+     * Create an OrderUpdate notification with de-duplication
+     * Prevents duplicate notifications for the same message/order within 5 minutes
      */
     public static function createOrderUpdateNotification($orderId, $message = null)
     {
@@ -89,34 +111,49 @@ class NotificationService
             return null;
         }
 
-        return Notification::create([
+        $message = $message ?? 'Your order status has been updated.';
+
+        // Check for duplicate notifications within 5 minutes
+        $existingNotification = Notification::where('order_id', $orderId)
+            ->where('notif_type', 'OrderUpdate')
+            ->where('message', $message)
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->first();
+
+        if ($existingNotification) {
+            Log::debug('Duplicate order update notification prevented', [
+                'order_id' => $orderId,
+                'message' => $message,
+            ]);
+            return $existingNotification;
+        }
+
+        $notification = Notification::create([
             'user_id' => $order->user_id,
             'order_id' => $orderId,
-            'message' => $message ?? 'Your order status has been updated.',
+            'message' => $message,
             'notif_type' => 'OrderUpdate',
             'is_read' => false,
         ]);
+
+        // Broadcast the notification
+        static::broadcastNotification($notification);
+
+        return $notification;
     }
 
     /**
-     * Create a Refund notification
-     * Allows multiple notifications - each refund event creates a new notification
+     * Broadcast notification to connected clients (via Laravel Broadcasting)
      */
-    public static function createRefundNotification($orderId, $message = null)
+    private static function broadcastNotification(Notification $notification)
     {
-        $order = Order::find($orderId);
-
-        if (!$order) {
-            return null;
+        try {
+            broadcast(new NotificationCreated($notification));
+        } catch (\Exception $e) {
+            Log::debug('Broadcasting notification (queue may not be configured)', [
+                'notification_id' => $notification->notification_id ?? $notification->id,
+            ]);
         }
-
-        return Notification::create([
-            'user_id' => $order->user_id,
-            'order_id' => $orderId,
-            'message' => $message ?? 'Your refund has been processed.',
-            'notif_type' => 'Refund',
-            'is_read' => false,
-        ]);
     }
 
     /**

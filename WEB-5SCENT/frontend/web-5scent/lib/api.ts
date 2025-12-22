@@ -12,6 +12,7 @@ const api = axios.create({
  * Enhanced error logging function
  * Logs detailed information about the error including URL, type, and response status
  * Skips verbose logging for expected client errors (4xx) that are handled by the application
+ * Also skips logging for network errors during development to avoid console spam
  */
 function logApiError(endpoint: string, error: any) {
   const timestamp = new Date().toISOString();
@@ -23,7 +24,13 @@ function logApiError(endpoint: string, error: any) {
     return;
   }
   
-  // Only log verbose errors for server errors (5xx) and network issues
+  // Skip logging for network errors (server down) to avoid console spam during development
+  if (!error.response && error.request) {
+    // Network error - silently fail to avoid spam
+    return;
+  }
+  
+  // Only log verbose errors for server errors (5xx) and other unexpected issues
   console.error(`[${timestamp}] API Error on ${endpoint}:`);
   console.error(`Base URL: ${api.defaults.baseURL}`);
   console.error(`Full URL: ${api.defaults.baseURL}${endpoint}`);

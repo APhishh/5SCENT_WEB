@@ -671,9 +671,12 @@ function OrderHistoryContent() {
                       onClick={() => handleOpenDetails(order)}
                       className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors"
                     >
-                      See Details
+                      View Details
                     </button>
-                    {order.status === 'Pending' ? (
+                    {order.status === 'Cancelled' ? (
+                      // For cancelled orders, only show View Details button (already above)
+                      null
+                    ) : order.status === 'Pending' ? (
                       <button
                         onClick={() => handleCancelOrder(order)}
                         className="flex-1 px-4 py-2.5 border border-red-300 text-red-600 rounded-full text-sm font-medium hover:bg-red-50 transition-colors"

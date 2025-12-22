@@ -90,6 +90,12 @@ export default function QrisPaymentClient({
     const now = new Date().getTime();
     const expireTime = new Date(qris.expired_at).getTime();
     let remaining = Math.max(0, expireTime - now);
+    
+    // Debug: Print actual time remaining in milliseconds
+    console.log('QrisPaymentClient Initial Actual Time Remaining:', remaining, 'ms');
+    console.log('QrisPaymentClient Expired At:', qris.expired_at);
+    console.log('QrisPaymentClient Current Time:', new Date().toISOString());
+    
     remaining = Math.min(remaining, 60000); // Cap at 1 minute
     setTimeRemaining(remaining);
 
@@ -104,6 +110,11 @@ export default function QrisPaymentClient({
       const expireTime = new Date(qris.expired_at).getTime();
       let remaining = Math.max(0, expireTime - now);
       
+      // Debug: Print actual time remaining in milliseconds
+      console.log('QrisPaymentClient Actual Time Remaining:', remaining, 'ms');
+      console.log('QrisPaymentClient Expired At:', qris.expired_at);
+      console.log('QrisPaymentClient Current Time:', new Date().toISOString());
+      
       // Cap at 1 minute (60000 ms) maximum
       remaining = Math.min(remaining, 60000);
       
@@ -111,6 +122,8 @@ export default function QrisPaymentClient({
       
       if (remaining === 0) {
         setIsExpired(true);
+        // Refresh notifications when payment expires
+        fetchNotifications();
         if (countdownIntervalRef.current) {
           clearInterval(countdownIntervalRef.current);
         }
@@ -139,7 +152,8 @@ export default function QrisPaymentClient({
           `/api/orders/${order.order_id}/payment-status`
         );
 
-        const qrisStatus = response.data?.qris_status;
+        // Use effective_status which accounts for expired_at timestamp
+        const qrisStatus = response.data?.effective_status || response.data?.qris_status;
 
         if (qrisStatus === 'settlement') {
           setIsPaymentSuccessful(true);
@@ -158,7 +172,8 @@ export default function QrisPaymentClient({
           if (pollingIntervalRef.current) {
             clearInterval(pollingIntervalRef.current);
           }
-          showToast('Payment expired. Please generate a new QR code.', 'error');
+          setIsExpired(true);
+          showToast('Payment expired. Please go back and create a new order.', 'error');
           // Refresh notifications to show the expiry notification
           fetchNotifications();
         } else if (qrisStatus === 'cancel') {

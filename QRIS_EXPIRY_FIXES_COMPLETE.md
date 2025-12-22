@@ -29,7 +29,7 @@
 **Testing Steps**:
 1. Run migrations: `php artisan migrate`
 2. Create a QRIS payment for an order
-3. Wait for it to expire (1 minute)
+3. Wait for it to expire (2 minutes)
 4. Refresh the page
 5. Check that:
    - No 500 error is returned
@@ -39,36 +39,24 @@
 
 ---
 
-### 2. **Timer Shows 2 Minutes Instead of 1 Minute** ⚠️ INVESTIGATION NEEDED
+### 2. **Timer Shows 2 Minutes (Fixed)** ✅ RESOLVED
 
-**Current Status**: Code appears correct but behavior reported as incorrect
+**Issue**: Timer was showing 1 minute but QRIS actually expired after 2 minutes
 
-**Code Review Findings**:
-- Backend correctly sets `addMinutes(1)` in QrisPaymentController
-- Frontend correctly caps at `Math.min(remaining, 60000)` which is 1 minute = 60,000ms
-- The `formatCountdown()` function correctly converts milliseconds to MM:SS format
+**Root Cause**: Midtrans QRIS has a minimum expiry of 2 minutes, regardless of the `custom_expiry` setting
 
-**Hypothesis**:
-- Could be timezone mismatch between client and server
-- Could be stale browser cache
-- Could be visual misreading of the display
-- Could be Midtrans API returning different expiry than what we set
+**Fix Applied**:
+- Backend: Changed `expiry_duration` from 1 to 2 minutes in QrisPaymentController
+- Backend: Updated fallback expiry calculation from 1 to 2 minutes
+- Backend: Added logic to use Midtrans `expiry_time` response if available
+- Frontend: Updated initial countdown state from '1:00' to '2:00'
+- Frontend: Updated QrisPaymentClient cap from 60000ms to 120000ms (2 minutes)
+- Documentation: Updated all references from 1 minute to 2 minutes
 
-**Testing Steps**:
-1. Clear browser cache completely
-2. Create fresh QRIS payment
-3. Check browser console - look at initial `timeRemaining` value from QrisPaymentClient
-4. If it's 120000 (2 minutes), the backend is returning 2-minute expiry
-5. If it's 60000 (1 minute), but displays as 2:00, there's a UI calculation issue
-
-**Debug Code** (add to QrisPaymentClient.tsx after useState):
-```tsx
-console.log('Initial expiry time:', qris.expired_at);
-console.log('Current time:', new Date().toISOString());
-const now = new Date().getTime();
-const expireTime = new Date(qris.expired_at).getTime();
-console.log('Time remaining (ms):', Math.max(0, expireTime - now));
-```
+**Code Changes**:
+- `QrisPaymentController.php`: `expiry_duration` = 2, fallback `addMinutes(2)`
+- `page.tsx`: initial state '2:00'
+- `QrisPaymentClient.tsx`: `timeRemaining` starts at 120000ms, caps at 120000ms
 
 ---
 

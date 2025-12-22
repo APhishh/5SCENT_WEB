@@ -55,6 +55,34 @@ class QrisPaymentController extends Controller
                 ], 400);
             }
 
+            // Check if there is an existing pending QRIS transaction that hasn't expired
+            $existingPendingQris = PaymentTransaction::where('order_id', $order->order_id)
+                ->where('status', 'pending')
+                ->where(function ($query) {
+                    // Must have expired_at in the future
+                    $query->whereNull('expired_at')
+                        ->orWhere('expired_at', '>', now());
+                })
+                ->first();
+
+            if ($existingPendingQris) {
+                // Reuse existing valid QRIS
+                Log::info('Reusing existing pending QRIS transaction', [
+                    'order_id' => $order->order_id,
+                    'qris_transaction_id' => $existingPendingQris->qris_transaction_id,
+                    'expired_at' => $existingPendingQris->expired_at,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'QRIS payment already exists',
+                    'qris_transaction_id' => $existingPendingQris->qris_transaction_id,
+                    'qr_url' => $existingPendingQris->qr_url,
+                    'expired_at' => $existingPendingQris->expired_at,
+                    'created_at' => $existingPendingQris->created_at,
+                ]);
+            }
+
             // Load order with relationships for Midtrans payload
             $order->load(['user', 'details.product']);
 
@@ -263,14 +291,29 @@ class QrisPaymentController extends Controller
             // Extract transaction status from response
             $transactionStatus = $response['transaction_status'] ?? 'pending';
 
-            // Set expiry time to 1 minute (matching Midtrans custom_expiry setting)
-            $expiredAt = now()->addMinutes(1);
+            // Set expiry time - use Midtrans expiry_time if available, otherwise default to 2 minutes
+            $expiredAt = null;
+            if (isset($response['expiry_time'])) {
+                // Use the actual expiry time from Midtrans
+                $expiredAt = \Carbon\Carbon::parse($response['expiry_time']);
+                Log::info('Using Midtrans expiry_time', [
+                    'expiry_time' => $response['expiry_time'],
+                    'parsed_expiry' => $expiredAt->toIso8601String(),
+                ]);
+            } else {
+                // Fallback to 1 minute from now (matching the custom_expiry setting)
+                $expiredAt = now()->addMinutes(1);
+                Log::warning('Midtrans did not return expiry_time, using fallback', [
+                    'fallback_expiry' => $expiredAt->toIso8601String(),
+                ]);
+            }
 
             Log::debug('Midtrans response fully processed', [
                 'transaction_id' => $transactionId,
                 'transaction_status' => $transactionStatus,
                 'qr_url_length' => strlen($qrUrl),
                 'will_expire_at' => $expiredAt->toIso8601String(),
+                'expiry_source' => isset($response['expiry_time']) ? 'midtrans_response' : 'fallback_calculation',
             ]);
 
             // Create or update payment transaction record with Midtrans response data

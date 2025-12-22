@@ -60,13 +60,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setUnreadCount(response.data.unread_count);
       }
     } catch (error: any) {
-      // Silently handle 401 errors (user not authenticated)
-      if (error.response?.status === 401) {
-        setNotifications([]);
-        setUnreadCount(0);
-        return;
+      // Silently handle errors during polling to avoid console spam
+      // Only log if it's not a network/server error (which happens during development)
+      if (error.response?.status && error.response.status < 500) {
+        console.error('Error fetching notifications:', error);
       }
-      console.error('Error fetching notifications:', error);
+      // For network errors (server down), silently fail
     } finally {
       setIsLoading(false);
     }
@@ -150,9 +149,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  // Fetch notifications on mount
+  // Fetch notifications on mount - no polling to avoid console spam during development
   useEffect(() => {
     fetchNotifications();
+
+    // Set up broadcast event listener for real-time notifications (if available)
+    if (typeof window !== 'undefined') {
+      const handleNotificationEvent = (event: CustomEvent) => {
+        const newNotification = event.detail;
+        setNotifications(prev => [newNotification, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      };
+
+      window.addEventListener('notification:created', handleNotificationEvent as EventListener);
+
+      return () => {
+        window.removeEventListener('notification:created', handleNotificationEvent as EventListener);
+      };
+    }
   }, [fetchNotifications]);
 
   const value: NotificationContextType = {

@@ -23,6 +23,7 @@ interface QrisData {
     total_items: number;
     total_price: number;
     user_id?: number;
+    created_at: string;
   };
   payment: {
     amount: number;
@@ -62,38 +63,29 @@ export default function QrisPage({ params }: PageProps) {
         const response = await api.get(`/orders/${orderId}/qris-detail`);
         
         if (response.data?.success && response.data?.qris) {
-          // Check if QRIS has expired by comparing with server time
-          const expiredAt = new Date(response.data.qris.expired_at).getTime();
-          const now = new Date().getTime();
-          const isExpired = expiredAt <= now;
+          const qris = response.data.qris;
           
-          if (isExpired && response.data?.qris?.status !== 'expired') {
-            // Payment expired - mark it as expired in backend
-            try {
-              await api.post(`/orders/${orderId}/qris-expired`);
-            } catch (expireError) {
-              console.error('Failed to mark QRIS as expired:', expireError);
-            }
-            // Show expired state
+          // Check effective status - if expired, do not re-generate
+          if (qris.effective_status === 'expire' || qris.status === 'expire') {
+            // QRIS has expired - show expired UI, do NOT create new payment
             setData(response.data);
-            showToast('Payment has expired. Order has been cancelled.', 'error');
+            showToast('Payment has expired. Please go back and create a new order.', 'error');
             fetchNotifications();
-          } else {
-            // QRIS is still valid or already marked expired
-            setData(response.data);
+            setLoading(false);
+            return;
           }
-          
+
+          // QRIS is still valid or pending - reuse it
+          setData(response.data);
           setLoading(false);
           return;
         }
       } catch (error) {
         console.error('Failed to fetch QRIS details:', error);
-        // If fetch fails, show error
-        setLoading(false);
-        return;
+        // If fetch fails, try to create fresh QRIS
       }
 
-      // Try to create fresh QRIS only if fetch completely failed
+      // Only create fresh QRIS if no existing one found
       try {
         const paymentResponse = await api.post(`/payments/qris`, {
           order_id: orderId,
@@ -127,9 +119,16 @@ export default function QrisPage({ params }: PageProps) {
       const now = new Date().getTime();
       const difference = expiryTime - now;
 
+      // Debug: Print actual time remaining in milliseconds
+      console.log('QRIS Initial Actual Time Remaining:', difference, 'ms');
+      console.log('Expired At:', data.qris.expired_at);
+      console.log('Current Time:', new Date().toISOString());
+
       if (difference <= 0) {
         setCountdown('0:00');
         setIsExpired(true);
+        // Refresh notifications when payment expires
+        fetchNotifications();
         return true; // Timer expired
       }
 
@@ -149,6 +148,11 @@ export default function QrisPage({ params }: PageProps) {
       const expiryTime = new Date(data.qris.expired_at).getTime();
       const now = new Date().getTime();
       const difference = expiryTime - now;
+
+      // Debug: Print actual time remaining in milliseconds
+      console.log('QRIS Actual Time Remaining:', difference, 'ms');
+      console.log('Expired At:', data.qris.expired_at);
+      console.log('Current Time:', new Date().toISOString());
 
       if (difference <= 0) {
         setCountdown('0:00');

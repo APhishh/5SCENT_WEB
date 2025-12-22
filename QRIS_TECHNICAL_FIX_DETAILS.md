@@ -32,22 +32,24 @@ The code path was:
 - File: `database/migrations/2025_12_11_000000_create_payment_transactions_table.php`: Creates `payment_transactions` table
 - Mismatch caused Laravel to query wrong table, returning no results or throwing exceptions
 
-### Issue #2: Timer Shows 2 Minutes Instead of 1 Minute
+### Issue #2: Timer Shows 2 Minutes Instead of 1 Minute (Fixed)
 
-**Symptom**: QRIS payment page shows countdown starting from 2:00 instead of 1:00
+**Symptom**: QRIS payment page showed countdown starting from 1:00 but QRIS actually expired after 2 minutes
+
+**Root Cause**: Midtrans QRIS has a minimum expiry of 2 minutes, regardless of the `custom_expiry` setting
 
 **Analysis**:
-- Backend sets: `$expiredAt = now()->addMinutes(1);` ✓ Correct
-- Frontend receives: `expired_at` timestamp from server
-- Frontend calculates: `remaining = Math.max(0, expireTime - now)` 
-- Frontend caps: `remaining = Math.min(remaining, 60000)` ✓ Caps at 1 minute
-- Frontend displays: `formatCountdown(remaining)` = `"1:00"` ✓ Should be correct
+- Backend was setting: `$expiredAt = now()->addMinutes(1);` 
+- Midtrans was ignoring this and using 2 minutes as minimum
+- Frontend countdown was correct but didn't match actual expiry
+- User experienced QR code working for 2 minutes while countdown showed 1 minute
 
-**Possible Causes** (need user testing to confirm):
-1. **Timezone Mismatch**: Server time ≠ Client time → calculation off
-2. **Browser Cache**: Old response with 2-minute expiry still cached
-3. **Midtrans API**: Returns different expiry than requested
-4. **Frontend Calculation Bug**: Some edge case in how remaining time is calculated
+**Fix Applied**:
+- Changed `expiry_duration` from 1 to 2 minutes in Midtrans payload
+- Updated backend fallback expiry from 1 to 2 minutes  
+- Added logic to use Midtrans `expiry_time` response if available
+- Updated frontend cap from 60000ms to 120000ms (2 minutes)
+- Updated initial countdown state to '2:00'
 
 ---
 
@@ -188,7 +190,7 @@ DESCRIBE qris_transactions;
 
 1. Create order in web interface
 2. Click "Pay with QRIS" → should generate QR code
-3. Wait for timer to expire (1 minute)
+3. Wait for timer to expire (2 minutes)
 4. Refresh page
 5. Check results:
    - ✓ No 500 error in console
